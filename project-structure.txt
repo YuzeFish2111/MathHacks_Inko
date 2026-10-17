@@ -1,0 +1,62 @@
+MathHacks Handwriting Legibility - Project Structure
+=====================================================
+Snapshot: 2026-10-17
+
+[x] = written    [~] = partly written    [ ] = placeholder only (file exists, no real content yet)
+.gitkeep files keep otherwise-empty folders in git.
+
+MathHacks_Project/
+|-- [ ] MathHacks-vibe-coding-plan.md    the project plan (paste HandwritingPlanv2 text here)
+|-- [x] .gitignore                       ignore list (node_modules/, .env, .DS_Store, __pycache__/,
+|                                        validation/samples/)
+|-- [x] project-structure.txt            this file
+|
+|-- backend/                             Python + FastAPI + OpenCV
+|   |-- [x] requirements.txt             numpy, opencv-python-headless, scipy, fastapi,
+|   |                                    python-multipart, pydantic, pytest, uvicorn, httpx
+|   |-- app/
+|   |   |-- [x] __init__.py              marks app/ as a Python package (empty on purpose)
+|   |   |-- [x] main.py                  FastAPI app, POST /api/analyze, GET /api/health
+|   |   |-- [x] schemas.py               Pydantic request/response models
+|   |   |-- [x] scoring_config.py        feature IDs, FEATURE_SOURCES, weights, curves, score bands,
+|   |   |                                pipeline / segmentation / deskew / measurement thresholds
+|   |   |-- [~] image_pipeline.py        decode, grayscale, resize, deskew, threshold, denoise -> inkMask;
+|   |   |                                LetterComponent, TextLine, find_text_lines, find_components
+|   |   |                                (still to do: lighting fix, page rectification + scale,
+|   |   |                                quality checks, gap overlays)
+|   |   |-- [x] measurements.py          the ten featureMeasurements
+|   |   |-- [x] scoring.py               curves, featureScores, legibilityScore, featureWeights,
+|   |   |                                missingFeatureIds, scoreLabel
+|   |   |-- [x] advice.py                weakest-first rule-based tips (templates per measurement + direction)
+|   |   `-- [ ] fit_weights.py           regression of weights against human ratings
+|   |-- scripts/
+|   |   `-- [x] preview_ink_mask.py      debug tool: prints and plots the ink mask (needs matplotlib)
+|   `-- tests/
+|       |-- [x] test_image_pipeline.py   lines, components, deskew
+|       |-- [x] test_measurements.py     all ten measurements on synthetic images
+|       |-- [x] test_scoring.py          curves, feature scores, renormalized weights, bands
+|       |-- [x] test_schemas.py          fixtures vs schema; TS and Python field names match
+|       |-- [x] test_advice.py
+|       `-- [x] test_api.py
+|
+|-- frontend/                            React + TypeScript (not started; no package.json yet)
+|   `-- src/
+|       |-- components/
+|       |-- pages/
+|       |-- api/                         API client (analyze request)
+|       `-- types/
+|           `-- [x] analysis.ts          TypeScript response interface
+|
+|-- shared/
+|   |-- [x] analysis-contract.md         API + variable glossary (from the plan)
+|   `-- fixtures/
+|       |-- [x] complete-response.json   (from the plan's example)
+|       `-- [x] needs-better-photo-response.json
+|
+|-- tests/
+|   `-- sample-images/                   hard cases collected during testing
+|
+`-- validation/
+    |-- samples/                         consented validation images (NOT public; git-ignored)
+    |-- [~] ratings.csv                  header only: sampleId, raterId, rating, readingAccuracyPct
+    `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results

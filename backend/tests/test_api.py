@@ -1,0 +1,112 @@
+import json
+
+import cv2
+import numpy as np
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.schemas import AnalysisResponse
+
+client = TestClient(app)
+A4 = {"pageWidthMm": "210", "pageHeightMm": "297"}
+
+
+def make_page_photo():
+    """A4-proportioned white page (1000 x 1414 px) with the pangram on two lines."""
+    page = np.full((1414, 1000, 3), 255, np.uint8)
+    cv2.putText(page, "The quick brown fox", (80, 400), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 3)
+    cv2.putText(page, "jumps over the lazy dog.", (80, 520), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 3)
+    return page
+
+
+def png_bytes(image):
+    return cv2.imencode(".png", image)[1].tobytes()
+
+
+def post(imageBytes, contentType="image/png", **fields):
+    return client.post("/api/analyze", data={**A4, **fields},
+                       files={"imageFile": ("photo.png", imageBytes, contentType)})
+
+
+def error_code(response):
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "needs_better_photo" and body["legibilityScore"] is None
+    return body["error"]["code"]
+
+
+def test_health():
+    assert client.get("/api/health").json() == {"status": "ok", "schemaVersion": "1.1"}
+
+
+def test_complete_result_without_corners():
+    response = post(png_bytes(make_page_photo()))
+    assert response.status_code == 200
+    body = response.json()
+    AnalysisResponse.model_validate(body)
+
+    assert body["status"] == "complete"
+    assert 0 <= body["legibilityScore"] <= 100 and body["scoreLabel"]
+    assert body["rectifiedImage"].startswith("data:image/jpeg;base64,")
+    assert any("No page corners" in warning for warning in body["warnings"])
+    assert [check["checkId"] for check in body["qualityChecks"]] == \
+        ["fileType", "fileSize", "decode", "imageSize", "inkAmount", "segmentation"]
+
+    overlay = body["overlayData"]
+    assert {line["kind"] for line in overlay["lines"]} == {"baseline", "xHeight"}
+    assert {gap["kind"] for gap in overlay["gaps"]} == {"letter", "word"}
+    for box in overlay["components"] + overlay["gaps"]:
+        assert 0 <= box["xPx"] and box["xPx"] + box["widthPx"] <= overlay["imageWidthPx"]
+        assert 0 <= box["yPx"] and box["yPx"] + box["heightPx"] <= overlay["imageHeightPx"]
+
+
+def test_corners_straighten_a_page_on_a_background():
+    # Put the page on a grey desk, shifted and slightly keystoned like a real photo
+    page = make_page_photo()
+    photo = np.full((1800, 1500, 3), 120, np.uint8)
+    corners = np.float32([[260, 180], [1240, 220], [1280, 1620], [220, 1600]])
+    transform = cv2.getPerspectiveTransform(np.float32([[0, 0], [999, 0], [999, 1413], [0, 1413]]), corners)
+    photo = cv2.warpPerspective(page, transform, (1500, 1800), dst=photo, borderMode=cv2.BORDER_TRANSPARENT)
+
+    body = post(png_bytes(photo), cornerPointsPx=json.dumps(corners.tolist())).json()
+    assert body["status"] == "complete"
+    assert {"checkId": "pageBounds", "passed": True, "message": None} in body["qualityChecks"]
+    assert not any("No page corners" in warning for warning in body["warnings"])
+    assert body["overlayData"]["imageWidthPx"] == 1000      # rectified to the target width
+
+
+def test_invalid_file_type():
+    assert error_code(post(b"hello", contentType="text/plain")) == "INVALID_FILE_TYPE"
+
+
+def test_file_that_is_not_an_image():
+    assert error_code(post(b"definitely not a png")) == "IMAGE_DECODE_FAILED"
+
+
+def test_image_too_small():
+    assert error_code(post(png_bytes(np.full((300, 300, 3), 255, np.uint8)))) == "IMAGE_TOO_SMALL"
+
+
+def test_blank_page_is_not_enough_writing():
+    assert error_code(post(png_bytes(np.full((1414, 1000, 3), 255, np.uint8)))) == "NOT_ENOUGH_WRITING"
+
+
+def test_corners_outside_the_photo():
+    corners = json.dumps([[0, 0], [5000, 0], [5000, 5000], [0, 5000]])
+    assert error_code(post(png_bytes(make_page_photo()), cornerPointsPx=corners)) == "PAGE_NOT_FOUND"
+
+
+def test_failed_check_is_reported_after_the_checks_that_passed():
+    body = post(png_bytes(np.full((300, 300, 3), 255, np.uint8))).json()
+    AnalysisResponse.model_validate(body)
+    assert [(check["checkId"], check["passed"]) for check in body["qualityChecks"]] == \
+        [("fileType", True), ("fileSize", True), ("decode", True), ("imageSize", False)]
+
+
+def test_bad_form_fields_are_http_422():
+    assert post(png_bytes(make_page_photo()), cornerPointsPx="not json").status_code == 422
+    assert post(png_bytes(make_page_photo()), cornerPointsPx="[[0, 0]]").status_code == 422
+    assert client.post("/api/analyze", data={"pageWidthMm": "-5", "pageHeightMm": "297"},
+                       files={"imageFile": ("p.png", png_bytes(make_page_photo()), "image/png")}).status_code == 422
+    assert client.post("/api/analyze", data={"pageHeightMm": "297"},
+                       files={"imageFile": ("p.png", png_bytes(make_page_photo()), "image/png")}).status_code == 422

@@ -1,0 +1,8 @@
+node_modules/
+.env
+.DS_Store
+__pycache__/
+
+# Consented validation images: never commit
+validation/samples/*
+!validation/samples/.gitkeep

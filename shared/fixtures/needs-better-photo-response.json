@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.1",
+  "status": "needs_better_photo",
+  "error": {
+    "code": "BLUR_TOO_HIGH",
+    "message": "The photo looks blurry. Try holding your phone steady and retaking it."
+  },
+  "legibilityScore": null,
+  "scoreLabel": null,
+  "rectifiedImage": null,
+  "featureMeasurements": null,
+  "featureScores": null,
+  "featureWeights": null,
+  "missingFeatureIds": [],
+  "warnings": [],
+  "qualityChecks": [
+    { "checkId": "blur", "passed": false,
+      "message": "The photo looks blurry." }
+  ],
+  "overlayData": null,
+  "advice": []
+}

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.1",
+  "status": "complete",
+  "error": null,
+  "legibilityScore": 78,
+  "scoreLabel": "Readable",
+  "rectifiedImage": "data:image/jpeg;base64,...",
+  "featureMeasurements": {
+    "textSizeMm": 6.2,
+    "xHeightMm": 3.1,
+    "baselineVariationMm": 0.8,
+    "aspectRatioCv": 0.24,
+    "solidityCv": 0.19,
+    "slantStdDeg": 5.4,
+    "strokeContrastRatio": 1.8,
+    "strokeWidthMedianMm": 0.42,
+    "relativeLetterSpacing": 0.31,
+    "letterSpacingCv": 0.38
+  },
+  "featureScores": {
+    "textSize": 0.86,
+    "xHeight": 0.93,
+    "baselineConsistency": 0.72,
+    "shapeConsistency": 0.81,
+    "strokeContrast": 0.78,
+    "strokeWeight": 0.84,
+    "letterSpacing": 0.68,
+    "spacingConsistency": 0.61
+  },
+  "featureWeights": {
+    "textSize": 0.125,
+    "xHeight": 0.125,
+    "baselineConsistency": 0.125,
+    "shapeConsistency": 0.125,
+    "strokeContrast": 0.125,
+    "strokeWeight": 0.125,
+    "letterSpacing": 0.125,
+    "spacingConsistency": 0.125
+  },
+  "missingFeatureIds": [],
+  "warnings": [],
+  "qualityChecks": [
+    { "checkId": "blur", "passed": true, "message": null }
+  ],
+  "overlayData": {
+    "coordinateSpace": "rectifiedImagePx",
+    "imageWidthPx": 1200,
+    "imageHeightPx": 1600,
+    "lines": [
+      { "lineId": "line-1", "kind": "baseline",
+        "x1Px": 100, "y1Px": 430, "x2Px": 1080, "y2Px": 438 }
+    ],
+    "components": [
+      { "componentId": "component-1", "lineId": "line-1",
+        "xPx": 120, "yPx": 390, "widthPx": 28, "heightPx": 40,
+        "issueFeatureIds": [] }
+    ],
+    "gaps": [
+      { "gapId": "gap-1", "lineId": "line-1", "kind": "letter",
+        "xPx": 148, "yPx": 410, "widthPx": 12, "heightPx": 4,
+        "issueFeatureIds": ["letterSpacing"] }
+    ]
+  },
+  "advice": [
+    {
+      "featureId": "spacingConsistency",
+      "title": "Make letter gaps more even",
+      "message": "Your letter gaps vary by 38% (coefficient of variation 0.38).",
+      "exercise": "Practice keeping a similar pencil-width gap between letters."
+    }
+  ]
+}
