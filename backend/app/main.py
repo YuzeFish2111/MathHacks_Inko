@@ -16,12 +16,14 @@ from pydantic import ValidationError
 
 from .advice import generate_advice
 from .image_pipeline import (decode_image, rectify_page, to_grayscale, resize_to_width, deskew,
-                             threshold_ink, remove_small_components, find_text_lines, find_components)
+                             threshold_ink, remove_small_components, find_text_lines, find_components,
+                             measure_ink_contrast, measure_edge_sharpness)
 from .measurements import compute_feature_measurements, find_gaps, fit_baseline, measure_x_height_px
 from .schemas import SCHEMA_VERSION, AnalysisResponse, AnalyzeRequestFields
 from .scoring import score_measurements
 from .scoring_config import (ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, MIN_IMAGE_SIDE_PX, MIN_INK_FRACTION,
-                             MIN_LETTERS_FOR_ANALYSIS, RECTIFIED_JPEG_QUALITY)
+                             MIN_INK_CONTRAST, MIN_EDGE_SHARPNESS, MIN_LETTERS_FOR_ANALYSIS,
+                             RECTIFIED_JPEG_QUALITY)
 
 
 # ---------- 1. App setup ----------
@@ -153,16 +155,34 @@ def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
     return deskewedImage, scaleMmPerPxX, scaleMmPerPxY
 
 
-# ---------- 6. Ink and segmentation checks: inkAmount, segmentation ----------
+# ---------- 6. Ink, contrast, blur and segmentation checks ----------
 
 def segment_writing(grayscaleImage: np.ndarray, qualityChecks: list[dict]):
-    """Return (inkMask, textLines), or raise PhotoProblem if there is too little writing to measure."""
+    """Return (inkMask, textLines), or raise PhotoProblem if the writing can't be measured reliably.
+
+    Order: inkAmount -> contrast -> blur -> segmentation. Contrast and blur are measured on the ink
+    that was found, so they run after inkAmount (a blank page should say "not enough writing").
+    They are measured on the straightened page, so the desk around the page doesn't affect them.
+    """
     inkMask = remove_small_components(threshold_ink(grayscaleImage))
     textLines = find_text_lines(inkMask)
     if (inkMask > 0).mean() < MIN_INK_FRACTION or not textLines:
         raise PhotoProblem("NOT_ENOUGH_WRITING", "inkAmount",
                            "We couldn't find enough writing. Write the full sentence and fill the frame with the page.")
     qualityChecks.append(passed("inkAmount"))
+
+    inkContrast = measure_ink_contrast(grayscaleImage, inkMask)
+    if inkContrast is None or inkContrast < MIN_INK_CONTRAST:
+        raise PhotoProblem("CONTRAST_TOO_LOW", "contrast",
+                           "The writing is too faint against the paper. Use a darker pen and take the photo "
+                           "in brighter, even light.")
+    qualityChecks.append(passed("contrast"))
+
+    edgeSharpness = measure_edge_sharpness(grayscaleImage, inkMask, inkContrast)
+    if edgeSharpness is None or edgeSharpness < MIN_EDGE_SHARPNESS:
+        raise PhotoProblem("BLUR_TOO_HIGH", "blur",
+                           "The photo looks blurry. Try holding your phone steady and retaking it.")
+    qualityChecks.append(passed("blur"))
 
     find_components(inkMask, textLines)
     letterCount = sum(component.kind == "letter" for line in textLines for component in line.components)

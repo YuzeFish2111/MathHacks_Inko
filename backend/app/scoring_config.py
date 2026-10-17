@@ -41,7 +41,11 @@ ALLOWED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024   # 15 MB; phone photos are usually 2-6 MB
 MIN_IMAGE_SIDE_PX = 600         # shorter side of the uploaded photo must be at least this
 MIN_INK_FRACTION = 0.0005       # less than this fraction of ink pixels -> NOT_ENOUGH_WRITING
-MIN_LETTERS_FOR_ANALYSIS = 10   # fewer clean letter components -> SEGMENTATION_UNCERTAIN (pangram has 35)
+MIN_INK_CONTRAST = 30           # paper minus ink brightness (0-255) below this -> CONTRAST_TOO_LOW
+                                # (black pen ~200+, light pencil ~45, barely visible ~25); not yet tuned on real photos
+MIN_EDGE_SHARPNESS = 0.2        # ink-edge steepness / contrast below this -> BLUR_TOO_HIGH
+                                # (sharp ~0.5; 2 px blur ~0.25; 3 px blur ~0.18 at 1000 px width); not yet tuned
+MIN_LETTERS_FOR_ANALYSIS = 10  # fewer clean letter components -> SEGMENTATION_UNCERTAIN (pangram has 35)
 RECTIFIED_JPEG_QUALITY = 85     # quality of the rectifiedImage data URL sent back to the browser
 
 # Image pipeline (backend/app/image_pipeline.py)

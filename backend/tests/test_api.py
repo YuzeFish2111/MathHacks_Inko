@@ -11,11 +11,12 @@ client = TestClient(app)
 A4 = {"pageWidthMm": "210", "pageHeightMm": "297"}
 
 
-def make_page_photo():
-    """A4-proportioned white page (1000 x 1414 px) with the pangram on two lines."""
-    page = np.full((1414, 1000, 3), 255, np.uint8)
-    cv2.putText(page, "The quick brown fox", (80, 400), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 3)
-    cv2.putText(page, "jumps over the lazy dog.", (80, 520), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 3)
+def make_page_photo(inkLevel=0, paperLevel=255):
+    """A4-proportioned page (1000 x 1414 px) with the pangram on two lines."""
+    page = np.full((1414, 1000, 3), paperLevel, np.uint8)
+    ink = (inkLevel, inkLevel, inkLevel)
+    cv2.putText(page, "The quick brown fox", (80, 400), cv2.FONT_HERSHEY_SIMPLEX, 1.6, ink, 3)
+    cv2.putText(page, "jumps over the lazy dog.", (80, 520), cv2.FONT_HERSHEY_SIMPLEX, 1.6, ink, 3)
     return page
 
 
@@ -50,7 +51,7 @@ def test_complete_result_without_corners():
     assert body["rectifiedImage"].startswith("data:image/jpeg;base64,")
     assert any("No page corners" in warning for warning in body["warnings"])
     assert [check["checkId"] for check in body["qualityChecks"]] == \
-        ["fileType", "fileSize", "decode", "imageSize", "inkAmount", "segmentation"]
+        ["fileType", "fileSize", "decode", "imageSize", "inkAmount", "contrast", "blur", "segmentation"]
 
     overlay = body["overlayData"]
     assert {line["kind"] for line in overlay["lines"]} == {"baseline", "xHeight"}
@@ -89,6 +90,24 @@ def test_image_too_small():
 
 def test_blank_page_is_not_enough_writing():
     assert error_code(post(png_bytes(np.full((1414, 1000, 3), 255, np.uint8)))) == "NOT_ENOUGH_WRITING"
+
+
+def test_blurry_photo():
+    blurry = cv2.GaussianBlur(make_page_photo(), (0, 0), 4)       # about 0.8 mm of blur on A4
+    assert error_code(post(png_bytes(blurry))) == "BLUR_TOO_HIGH"
+
+
+def test_slightly_soft_photo_still_passes():
+    soft = cv2.GaussianBlur(make_page_photo(), (0, 0), 1)         # normal phone-camera softness
+    assert post(png_bytes(soft)).json()["status"] == "complete"
+
+
+def test_faint_writing_is_low_contrast():
+    assert error_code(post(png_bytes(make_page_photo(inkLevel=215, paperLevel=235)))) == "CONTRAST_TOO_LOW"
+
+
+def test_light_pencil_still_passes():
+    assert post(png_bytes(make_page_photo(inkLevel=150, paperLevel=230))).json()["status"] == "complete"
 
 
 def test_corners_outside_the_photo():

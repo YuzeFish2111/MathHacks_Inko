@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -112,6 +113,41 @@ def remove_small_components(inkMask: np.ndarray, minAreaPx: int = MIN_COMPONENT_
     keep = componentStats[:, cv2.CC_STAT_AREA] >= minAreaPx
     keep[0] = False    # label 0 is the paper background
     return np.where(keep[labels], 255, 0).astype(np.uint8)
+
+
+def measure_ink_contrast(grayscaleImage: np.ndarray, inkMask: np.ndarray) -> Optional[float]:
+    """Paper brightness minus ink darkness, 0-255 (median of each).
+
+    Paper pixels are taken a few pixels away from any ink, so stroke edges don't count as paper.
+    None if there is no ink or no paper to compare.
+    """
+    isInk = inkMask > 0
+    isPaper = cv2.dilate(inkMask, np.ones((5, 5), np.uint8)) == 0
+    if not isInk.any() or not isPaper.any():
+        return None
+    return float(np.median(grayscaleImage[isPaper]) - np.median(grayscaleImage[isInk]))
+
+
+def measure_edge_sharpness(grayscaleImage: np.ndarray, inkMask: np.ndarray,
+                           inkContrast: Optional[float]) -> Optional[float]:
+    """How steep the ink edges are, relative to the ink contrast (about 0.5 = perfectly sharp).
+
+    Takes the 90th percentile brightness gradient (per pixel) on the boundary of the ink mask,
+    divided by inkContrast. Blur spreads each edge over more pixels, lowering the ratio; dividing
+    by contrast means faint-but-sharp writing is not mistaken for blur.
+    """
+    if not inkContrast or inkContrast <= 0:
+        return None
+    imageFloat = grayscaleImage.astype(np.float32)
+    # Sobel / 8 = brightness change per pixel (central difference, smoothed across 3 rows)
+    gradientX = cv2.Sobel(imageFloat, cv2.CV_32F, 1, 0, ksize=3) / 8
+    gradientY = cv2.Sobel(imageFloat, cv2.CV_32F, 0, 1, ksize=3) / 8
+    gradientMagnitude = np.hypot(gradientX, gradientY)
+
+    isEdge = cv2.morphologyEx(inkMask, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0
+    if not isEdge.any():
+        return None
+    return float(np.percentile(gradientMagnitude[isEdge], 90) / inkContrast)
 
 
 def rotate_image(image: np.ndarray, angleDeg: float, borderMode: int = cv2.BORDER_CONSTANT,

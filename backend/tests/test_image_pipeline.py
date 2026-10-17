@@ -1,7 +1,9 @@
 import cv2
 import numpy as np
 
-from app.image_pipeline import find_text_lines, find_components, rotate_image, deskew
+from app.image_pipeline import (find_text_lines, find_components, rotate_image, deskew,
+                                threshold_ink, remove_small_components,
+                                measure_ink_contrast, measure_edge_sharpness)
 from app.scoring_config import DESKEW_STEP_DEG
 
 
@@ -79,3 +81,37 @@ def test_deskew_undoes_a_known_tilt():
 def test_deskew_leaves_straight_and_blank_pages_alone():
     assert deskew(make_text_page())[1] == 0
     assert deskew(np.full((300, 300), 255, np.uint8))[1] == 0
+
+
+def contrast_and_sharpness(grayscalePage):
+    inkMask = remove_small_components(threshold_ink(grayscalePage))
+    inkContrast = measure_ink_contrast(grayscalePage, inkMask)
+    return inkContrast, measure_edge_sharpness(grayscalePage, inkMask, inkContrast)
+
+
+def test_ink_contrast_is_paper_minus_ink():
+    page = np.full((600, 1000), 230, np.uint8)
+    cv2.putText(page, "The quick brown fox", (60, 250), cv2.FONT_HERSHEY_SIMPLEX, 2, 80, 3)
+    assert contrast_and_sharpness(page)[0] == 150
+
+
+def test_sharpness_is_about_half_for_a_sharp_edge_and_drops_with_blur():
+    sharpness = [contrast_and_sharpness(make_text_page() if sigma == 0 else
+                                        cv2.GaussianBlur(make_text_page(), (0, 0), sigma))[1]
+                 for sigma in (0, 1, 2, 4)]
+    assert 0.45 <= sharpness[0] <= 0.55
+    assert sharpness == sorted(sharpness, reverse=True)          # more blur, less sharp
+
+
+def test_faint_but_sharp_writing_is_not_called_blurry():
+    page = np.full((600, 1000), 235, np.uint8)
+    cv2.putText(page, "The quick brown fox", (60, 250), cv2.FONT_HERSHEY_SIMPLEX, 2, 190, 3)
+    inkContrast, sharpness = contrast_and_sharpness(page)
+    assert inkContrast < 60 and sharpness > 0.45
+
+
+def test_contrast_and_sharpness_are_null_without_ink():
+    blank = np.full((300, 300), 255, np.uint8)
+    noInk = np.zeros((300, 300), np.uint8)
+    assert measure_ink_contrast(blank, noInk) is None
+    assert measure_edge_sharpness(blank, noInk, None) is None
