@@ -21,10 +21,10 @@ MathHacks_Project/
 |   |   |-- [x] schemas.py               Pydantic request/response models
 |   |   |-- [x] scoring_config.py        feature IDs, FEATURE_SOURCES, weights, curves, score bands,
 |   |   |                                pipeline / segmentation / deskew / measurement thresholds
-|   |   |-- [~] image_pipeline.py        decode, rectify_page (manual corners), grayscale, resize, deskew,
+|   |   |-- [~] image_pipeline.py        decode, detect_page_corners, rectify_page, grayscale, resize, deskew,
 |   |   |                                threshold, denoise -> inkMask; contrast + edge sharpness;
 |   |   |                                LetterComponent, TextLine, find_text_lines, find_components
-|   |   |                                (still to do: uneven-lighting fix, automatic page detection)
+|   |   |                                (still to do: uneven-lighting fix)
 |   |   |-- [x] measurements.py          the ten featureMeasurements; fit_baseline, find_gaps (overlays)
 |   |   |-- [x] scoring.py               curves, featureScores, legibilityScore, featureWeights,
 |   |   |                                missingFeatureIds, scoreLabel
@@ -33,7 +33,7 @@ MathHacks_Project/
 |   |-- scripts/
 |   |   `-- [x] preview_ink_mask.py      debug tool: prints and plots the ink mask (needs matplotlib)
 |   `-- tests/
-|       |-- [x] test_image_pipeline.py   lines, components, deskew, contrast, sharpness
+|       |-- [x] test_image_pipeline.py   lines, components, deskew, contrast, sharpness, page detection
 |       |-- [x] test_measurements.py     all ten measurements on synthetic images
 |       |-- [x] test_scoring.py          curves, feature scores, renormalized weights, bands
 |       |-- [x] test_schemas.py          fixtures vs schema; TS and Python field names match
@@ -63,13 +63,12 @@ MathHacks_Project/
     `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results
 
 
-BACKEND PROGRESS  (64/64 tests passing; all on synthetic images)
+BACKEND PROGRESS  (70/70 tests passing; all on synthetic images)
 ================================================================
 Plan step                                   Status
 0. Lock contract                            [x] contract, fixtures, schemas.py, analysis.ts, drift tests
-2. Image input and page geometry            [~] upload checks, manual-corner rectification, mm scale,
-                                                blur + contrast checks done;
-                                                automatic page detection not started
+2. Image input and page geometry            [x] upload checks, automatic page detection, manual-corner
+                                                rectification, mm scale, blur + contrast checks
 3. Preprocessing and segmentation           [~] ink mask, deskew, lines, components, marks/clusters,
                                                 segmentation check done;
                                                 uneven-lighting normalization not started
@@ -79,7 +78,8 @@ Plan step                                   Status
                                                 fit_weights.py and validation analysis not started
 
 Contract coverage
-  cornerPointsPx        [x] parsed, validated (4 points, inside photo), used to rectify the page
+  cornerPointsPx        [x] parsed, validated (4 points, inside photo), used to rectify the page;
+                            detected automatically when not sent
   needs_better_photo    [x] all 9 error codes produced and tested:
                             INVALID_FILE_TYPE, FILE_TOO_LARGE, IMAGE_DECODE_FAILED, IMAGE_TOO_SMALL,
                             BLUR_TOO_HIGH, CONTRAST_TOO_LOW, PAGE_NOT_FOUND, NOT_ENOUGH_WRITING,
@@ -88,7 +88,8 @@ Contract coverage
 Remaining backend work
   [ ] Test and tune thresholds on real phone photos (tests/sample-images/)
   [ ] Uneven-lighting normalization (backgroundEstimate -> normalizedImage)
-  [ ] Automatic page detection when no cornerPointsPx are sent
+  [x] Automatic page detection when no cornerPointsPx are sent
+  [ ] Endpoint that returns detected corners for the preview/crop screen (contract addition)
   [ ] issueFeatureIds on overlay components and gaps
   [ ] fit_weights.py once validation ratings exist
   [ ] Optional: letter-level work (x-height consistency, comparison to an ideal example)

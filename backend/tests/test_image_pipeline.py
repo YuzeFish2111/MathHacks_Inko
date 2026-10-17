@@ -3,7 +3,7 @@ import numpy as np
 
 from app.image_pipeline import (find_text_lines, find_components, rotate_image, deskew,
                                 threshold_ink, remove_small_components,
-                                measure_ink_contrast, measure_edge_sharpness)
+                                measure_ink_contrast, measure_edge_sharpness, detect_page_corners)
 from app.scoring_config import DESKEW_STEP_DEG
 
 
@@ -115,3 +115,52 @@ def test_contrast_and_sharpness_are_null_without_ink():
     noInk = np.zeros((300, 300), np.uint8)
     assert measure_ink_contrast(blank, noInk) is None
     assert measure_edge_sharpness(blank, noInk, None) is None
+
+
+KEYSTONED_CORNERS = [[260, 180], [1240, 220], [1280, 1620], [220, 1600]]
+
+
+def photo_of_page_on_desk(deskLevel, corners, seed=0):
+    """A 1500 x 1800 'photo': an A4 page with writing, warped onto a noisy desk."""
+    rng = np.random.default_rng(seed)
+    photo = np.clip(np.full((1800, 1500, 3), deskLevel, np.float32) + rng.normal(0, 6, (1800, 1500, 3)),
+                    0, 255).astype(np.uint8)
+    page = np.full((1414, 1000, 3), 240, np.uint8)
+    cv2.putText(page, "The quick brown fox", (80, 400), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 3)
+    pageCorners = np.float32([[0, 0], [999, 0], [999, 1413], [0, 1413]])
+    transform = cv2.getPerspectiveTransform(pageCorners, np.float32(corners))
+    return cv2.warpPerspective(page, transform, (1500, 1800), dst=photo, borderMode=cv2.BORDER_TRANSPARENT)
+
+
+def max_corner_error_px(found, expected):
+    return float(np.abs(np.float32(found) - np.float32(expected)).max())
+
+
+def test_detects_a_keystoned_page_on_dark_and_light_desks():
+    for deskLevel in (90, 200):        # 90: brightness mask finds it; 200: edge mask is needed
+        found = detect_page_corners(photo_of_page_on_desk(deskLevel, KEYSTONED_CORNERS), 210, 297)
+        assert found is not None and max_corner_error_px(found, KEYSTONED_CORNERS) <= 6, deskLevel
+
+
+def test_detects_a_rotated_page_and_returns_corners_in_order():
+    corners = [[400, 150], [1350, 280], [1150, 1650], [180, 1520]]      # about 8 degrees clockwise
+    found = detect_page_corners(photo_of_page_on_desk(150, corners), 210, 297)
+    assert found is not None and max_corner_error_px(found, corners) <= 6
+
+
+def test_detects_a_smaller_page():
+    corners = [[400, 400], [1100, 400], [1100, 1390], [400, 1390]]      # about 26% of the photo
+    assert detect_page_corners(photo_of_page_on_desk(90, corners), 210, 297) is not None
+
+
+def test_no_page_found_when_it_fills_the_frame_or_is_missing():
+    fullFramePage = np.full((1414, 1000, 3), 255, np.uint8)
+    cv2.putText(fullFramePage, "The quick brown fox", (80, 400), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 3)
+    assert detect_page_corners(fullFramePage, 210, 297) is None
+    noise = (np.random.default_rng(1).random((1800, 1500, 3)) * 255).astype(np.uint8)
+    assert detect_page_corners(noise, 210, 297) is None
+
+
+def test_page_with_the_wrong_shape_is_rejected():
+    # A portrait page, but the user said landscape (297 x 210): don't stretch it to fit
+    assert detect_page_corners(photo_of_page_on_desk(90, KEYSTONED_CORNERS), 297, 210) is None

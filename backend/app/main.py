@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from .advice import generate_advice
-from .image_pipeline import (decode_image, rectify_page, to_grayscale, resize_to_width, deskew,
+from .image_pipeline import (decode_image, detect_page_corners, rectify_page, to_grayscale, resize_to_width, deskew,
                              threshold_ink, remove_small_components, find_text_lines, find_components,
                              measure_ink_contrast, measure_edge_sharpness)
 from .measurements import compute_feature_measurements, find_gaps, fit_baseline, measure_x_height_px
@@ -130,13 +130,18 @@ def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
                  qualityChecks: list[dict], warnings: list[str]):
     """Return (deskewed grayscale page, scaleMmPerPxX, scaleMmPerPxY).
 
+    Corners come from the user (cornerPointsPx) or, if none were sent, from automatic detection.
     With corners: perspective-correct the page, so the scale is exact.
-    Without corners: assume the photo shows exactly the page (approximate; adds a warning).
+    No corners found: assume the photo shows exactly the page (approximate; adds a warning).
     The scale is computed BEFORE deskew, because rotating enlarges the canvas but keeps mm per pixel.
     """
-    if fields.cornerPointsPx is not None:
+    cornerPointsPx = fields.cornerPointsPx
+    if cornerPointsPx is None:
+        cornerPointsPx = detect_page_corners(originalImage, fields.pageWidthMm, fields.pageHeightMm)
+
+    if cornerPointsPx is not None:
         try:
-            pageImage = rectify_page(originalImage, fields.cornerPointsPx, fields.pageWidthMm, fields.pageHeightMm)
+            pageImage = rectify_page(originalImage, cornerPointsPx, fields.pageWidthMm, fields.pageHeightMm)
         except ValueError:
             raise PhotoProblem("PAGE_NOT_FOUND", "pageBounds",
                                "The page corners don't fit the photo. Adjust the corners and try again.")
@@ -144,8 +149,8 @@ def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
         grayscaleImage = to_grayscale(pageImage)
     else:
         grayscaleImage = resize_to_width(to_grayscale(originalImage))
-        warnings.append("No page corners were given, so the whole photo was treated as the page. "
-                        "Sizes in mm may be inaccurate.")
+        warnings.append("The page edges weren't found, so the whole photo was treated as the page. "
+                        "Sizes in mm may be inaccurate; adjust the corners for an exact result.")
 
     pageHeightPx, pageWidthPx = grayscaleImage.shape
     scaleMmPerPxX = fields.pageWidthMm / pageWidthPx

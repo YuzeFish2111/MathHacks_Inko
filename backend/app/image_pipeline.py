@@ -8,7 +8,9 @@ from .scoring_config import (TARGET_IMAGE_WIDTH_PX, BLUR_KERNEL_PX, THRESHOLD_BL
                              THRESHOLD_OFFSET_C, MIN_COMPONENT_AREA_PX,
                              LINE_MIN_INK_FRACTION, LINE_MERGE_GAP_PX, LINE_MIN_HEIGHT_PX,
                              NEAR_LINE_MAX_GAP_RATIO, MARK_MAX_HEIGHT_RATIO, CLUSTER_MIN_WIDTH_RATIO,
-                             DESKEW_MAX_ANGLE_DEG, DESKEW_STEP_DEG)
+                             DESKEW_MAX_ANGLE_DEG, DESKEW_STEP_DEG,
+                             PAGE_DETECT_MAX_SIDE_PX, PAGE_MIN_AREA_FRACTION, PAGE_MAX_AREA_FRACTION,
+                             PAGE_ASPECT_TOLERANCE, PAGE_MIN_BRIGHTNESS_GAIN)
 
 
 @dataclass
@@ -77,6 +79,95 @@ def rectify_page(originalImage: np.ndarray, cornerPointsPx: list[tuple[float, fl
     transform = cv2.getPerspectiveTransform(sourceCorners, targetCorners)
     return cv2.warpPerspective(originalImage, transform, (targetWidthPx, targetHeightPx),
                                flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REPLICATE)
+
+
+def _order_corners(points: np.ndarray) -> Optional[np.ndarray]:
+    """Order four points top-left, top-right, bottom-right, bottom-left.
+
+    Top-left has the smallest x + y and bottom-right the largest; top-right has the smallest
+    y - x and bottom-left the largest. None if two roles land on the same point (page turned ~45 degrees).
+    """
+    pointSums = points.sum(axis=1)
+    pointDiffs = points[:, 1] - points[:, 0]
+    order = [np.argmin(pointSums), np.argmin(pointDiffs), np.argmax(pointSums), np.argmax(pointDiffs)]
+    if len(set(int(index) for index in order)) < 4:
+        return None
+    return points[order].astype(np.float32)
+
+
+def _quad_from_contour(contour: np.ndarray) -> Optional[np.ndarray]:
+    """Simplify an outline to exactly four corners, or None.
+
+    The convex hull removes dents (e.g. a thumb or a text line touching the edge); the polygon is then
+    simplified with increasing tolerance (2-5% of its perimeter) until four corners remain.
+    """
+    hull = cv2.convexHull(contour)
+    perimeterPx = cv2.arcLength(hull, True)
+    for toleranceRatio in (0.02, 0.03, 0.04, 0.05):
+        polygon = cv2.approxPolyDP(hull, toleranceRatio * perimeterPx, True)
+        if len(polygon) == 4:
+            return polygon.reshape(4, 2).astype(np.float32)
+    return None
+
+
+def _candidate_page_masks(grayscaleImage: np.ndarray):
+    """Two ways of outlining the page, tried in order.
+
+    1. Brightness: paper is usually the brightest large area. Otsu picks the paper/background
+       threshold; closing fills in the dark writing so the page is one solid blob.
+    2. Edges: for a light desk, use Canny edges, thickened so small breaks in the border join up.
+    """
+    blurredImage = cv2.GaussianBlur(grayscaleImage, (5, 5), 0)
+
+    _, brightMask = cv2.threshold(blurredImage, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    yield cv2.morphologyEx(brightMask, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+
+    medianLevel = float(np.median(blurredImage))
+    edges = cv2.Canny(blurredImage, 0.66 * medianLevel, 1.33 * medianLevel)
+    yield cv2.dilate(edges, np.ones((5, 5), np.uint8))
+
+
+def _looks_like_page(corners: np.ndarray, grayscaleImage: np.ndarray,
+                     pageWidthMm: float, pageHeightMm: float) -> bool:
+    """Size, shape and brightness checks that reject desks, books and blocks of text."""
+    imageAreaPx = grayscaleImage.shape[0] * grayscaleImage.shape[1]
+    areaFraction = cv2.contourArea(corners) / imageAreaPx
+    if not PAGE_MIN_AREA_FRACTION <= areaFraction <= PAGE_MAX_AREA_FRACTION:
+        return False
+
+    # Shape: average opposite sides, compare height/width with the paper's (allows some perspective)
+    topLeft, topRight, bottomRight, bottomLeft = corners
+    widthPx = (np.linalg.norm(topRight - topLeft) + np.linalg.norm(bottomRight - bottomLeft)) / 2
+    heightPx = (np.linalg.norm(bottomLeft - topLeft) + np.linalg.norm(bottomRight - topRight)) / 2
+    if widthPx == 0 or abs((heightPx / widthPx) / (pageHeightMm / pageWidthMm) - 1) > PAGE_ASPECT_TOLERANCE:
+        return False
+
+    # Brightness: paper should be brighter than what surrounds it (a block of text is darker, not brighter)
+    insideMask = np.zeros(grayscaleImage.shape, np.uint8)
+    cv2.fillConvexPoly(insideMask, corners.astype(np.int32), 255)
+    inside, outside = grayscaleImage[insideMask > 0], grayscaleImage[insideMask == 0]
+    return outside.size > 0 and float(np.median(inside)) - float(np.median(outside)) >= PAGE_MIN_BRIGHTNESS_GAIN
+
+
+def detect_page_corners(originalImage: np.ndarray, pageWidthMm: float,
+                        pageHeightMm: float) -> Optional[list[tuple[float, float]]]:
+    """Find the page's four corners automatically (cornerPointsPx in originalImage pixels), or None.
+
+    None means no convincing page was found, including when the page already fills the whole photo.
+    """
+    imageHeightPx, imageWidthPx = originalImage.shape[:2]
+    shrinkFactor = min(1.0, PAGE_DETECT_MAX_SIDE_PX / max(imageHeightPx, imageWidthPx))
+    smallImage = cv2.resize(originalImage, None, fx=shrinkFactor, fy=shrinkFactor, interpolation=cv2.INTER_AREA)
+    smallGrayscale = to_grayscale(smallImage)
+
+    for pageMask in _candidate_page_masks(smallGrayscale):
+        contours, _ = cv2.findContours(pageMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:5]:    # biggest outlines first
+            quad = _quad_from_contour(contour)
+            corners = _order_corners(quad) if quad is not None else None
+            if corners is not None and _looks_like_page(corners, smallGrayscale, pageWidthMm, pageHeightMm):
+                return [(float(x), float(y)) for x, y in corners / shrinkFactor]
+    return None
 
 
 def to_grayscale(originalImage: np.ndarray) -> np.ndarray:

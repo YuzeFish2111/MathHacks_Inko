@@ -50,7 +50,7 @@ def test_complete_result_without_corners():
     assert body["status"] == "complete"
     assert 0 <= body["legibilityScore"] <= 100 and body["scoreLabel"]
     assert body["rectifiedImage"].startswith("data:image/jpeg;base64,")
-    assert any("No page corners" in warning for warning in body["warnings"])
+    assert any("whole photo" in warning for warning in body["warnings"])
     assert [check["checkId"] for check in body["qualityChecks"]] == \
         ["fileType", "fileSize", "decode", "imageSize", "inkAmount", "contrast", "blur", "segmentation"]
 
@@ -73,8 +73,21 @@ def test_corners_straighten_a_page_on_a_background():
     body = post(png_bytes(photo), cornerPointsPx=json.dumps(corners.tolist())).json()
     assert body["status"] == "complete"
     assert {"checkId": "pageBounds", "passed": True, "message": None} in body["qualityChecks"]
-    assert not any("No page corners" in warning for warning in body["warnings"])
+    assert not any("whole photo" in warning for warning in body["warnings"])
     assert body["overlayData"]["imageWidthPx"] == 1000      # rectified to the target width
+
+
+def test_page_is_found_automatically_without_corners():
+    page = make_page_photo(paperLevel=240)
+    photo = np.full((1800, 1500, 3), 90, np.uint8)
+    corners = np.float32([[260, 180], [1240, 220], [1280, 1620], [220, 1600]])
+    transform = cv2.getPerspectiveTransform(np.float32([[0, 0], [999, 0], [999, 1413], [0, 1413]]), corners)
+    photo = cv2.warpPerspective(page, transform, (1500, 1800), dst=photo, borderMode=cv2.BORDER_TRANSPARENT)
+
+    body = post(png_bytes(photo)).json()                     # no cornerPointsPx sent
+    assert body["status"] == "complete"
+    assert {"checkId": "pageBounds", "passed": True, "message": None} in body["qualityChecks"]
+    assert not any("whole photo" in warning for warning in body["warnings"])
 
 
 def test_invalid_file_type():

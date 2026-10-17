@@ -48,6 +48,13 @@ MIN_EDGE_SHARPNESS = 0.2        # ink-edge steepness / contrast below this -> BL
 MIN_LETTERS_FOR_ANALYSIS = 10  # fewer clean letter components -> SEGMENTATION_UNCERTAIN (pangram has 35)
 RECTIFIED_JPEG_QUALITY = 85     # quality of the rectifiedImage data URL sent back to the browser
 
+# Automatic page detection (used when no cornerPointsPx are sent)
+PAGE_DETECT_MAX_SIDE_PX = 800   # photo is shrunk to this long side for detection (speed); corners are scaled back
+PAGE_MIN_AREA_FRACTION = 0.2    # the page must cover at least this fraction of the photo
+PAGE_MAX_AREA_FRACTION = 0.97   # a "page" this big is just the photo's own border: the page fills the frame
+PAGE_ASPECT_TOLERANCE = 0.35    # detected height/width may differ from the paper's by this fraction (perspective)
+PAGE_MIN_BRIGHTNESS_GAIN = 15   # page must be this much brighter (0-255) than its surroundings
+
 # Image pipeline (backend/app/image_pipeline.py)
 TARGET_IMAGE_WIDTH_PX = 1000    # resize width, applied BEFORE thresholding
 BLUR_KERNEL_PX = 3              # Gaussian blur kernel size; must be odd
