@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SCHEMA_VERSION = "1.1"
 
+# Literal[...] = only these exact strings are allowed; any other value fails validation
 FeatureId = Literal["textSize", "xHeight", "baselineConsistency", "shapeConsistency",
                     "strokeContrast", "strokeWeight", "letterSpacing", "spacingConsistency"]
 CheckId = Literal["fileType", "fileSize", "decode", "imageSize", "blur", "contrast",

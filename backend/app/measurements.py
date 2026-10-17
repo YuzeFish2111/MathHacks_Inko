@@ -1,6 +1,6 @@
-"""The ten feature Measurements.
+"""The ten featureMeasurements.
 
-Everything is measured in rectifie Image pixels and converted to mm only at the end.
+Everything is measured in rectifiedImage pixels and converted to mm only at the end.
 Any measurement that cannot be estimated reliably is None (null), never 0.
 Only components of kind "letter" are used for shape and size; "mark" (dots, punctuation)
 and "cluster" (joined letters) would distort them.
@@ -16,7 +16,10 @@ from .image_pipeline import LetterComponent, TextLine
 from .scoring_config import (MIN_COMPONENTS_FOR_STATS, MIN_GAPS_FOR_STATS, MIN_LETTERS_FOR_BASELINE,
                              X_HEIGHT_ROW_FRACTION, WORD_GAP_MIN_RATIO)
 
-MAD_TO_STD = 1.4826    # scales a median absolute deviation to match a standard deviation
+# Median absolute deviation (MAD) x 1.4826 equals the standard deviation for normally distributed data,
+# but a few extreme values (descenders, stray marks) barely move it. 1.4826 = 1 / 0.6745, where 0.6745
+# is the 75th percentile of the standard normal distribution.
+MAD_TO_STD = 1.4826
 
 
 # ---------- helpers ----------
@@ -27,7 +30,11 @@ def _letters(textLines: list[TextLine]) -> list[LetterComponent]:
 
 
 def _cv(values: list[float], minCount: int = MIN_COMPONENTS_FOR_STATS) -> Optional[float]:
-    """Coefficient of variation (std / mean). None if too few values or the mean is 0."""
+    """Coefficient of variation (std / mean). None if too few values or the mean is 0.
+
+    A unitless measure of unevenness: 0 = all values identical, 0.38 = they typically differ from the
+    average by 38%. Being unitless, it means the same at any writing size.
+    """
     if len(values) < minCount:
         return None
     mean = float(np.mean(values))
@@ -78,7 +85,9 @@ def _letter_bottoms_px(line: TextLine) -> tuple[np.ndarray, np.ndarray]:
 def fit_baseline(line: TextLine) -> Optional[tuple[float, float]]:
     """(slope, intercept) of a Theil-Sen line through the letter bottoms: y = slope * x + intercept.
 
-    Theil-Sen is robust to a few outliers such as descenders. None if the line has too few letters.
+    Theil-Sen takes the median of the slopes between every pair of points, so a few outliers
+    (descenders, a floating letter) can't tilt the line the way they would an ordinary least-squares fit.
+    None if the line has too few letters.
     """
     centersXPx, bottomsPx = _letter_bottoms_px(line)
     if len(bottomsPx) < MIN_LETTERS_FOR_BASELINE:
@@ -115,7 +124,11 @@ def measure_aspect_ratio_cv(textLines: list[TextLine]) -> Optional[float]:
 
 
 def measure_solidity_cv(textLines: list[TextLine]) -> Optional[float]:
-    """CV of letter solidity (outline area / convex hull area)."""
+    """CV of letter solidity (outline area / convex hull area).
+
+    The convex hull is the shape a rubber band would make around the letter. Solidity near 1 = a
+    compact shape (o, e); lower = open or spiky (k, x). Varied solidity = letters formed inconsistently.
+    """
     solidities = []
     for component in _letters(textLines):
         hullAreaPx = cv2.contourArea(cv2.convexHull(component.contour))
@@ -127,7 +140,10 @@ def measure_solidity_cv(textLines: list[TextLine]) -> Optional[float]:
 def letter_slant_deg(component: LetterComponent) -> Optional[float]:
     """One letter's slant in degrees (0 = upright), or None for a shape with no height.
 
-    From second-order moments: mu11 / mu02 is how much x shifts per unit of y.
+    From second-order (central) moments of the outline: mu02 measures how spread out the shape is
+    vertically and mu11 how much x and y vary together. Their ratio is the slope of x against y,
+    i.e. how far the letter shifts sideways per unit of height (a regression of x on y).
+    Lopsided upright letters (h, r, b, d) read up to ~17 degrees, so compare slants, not absolute values.
     """
     moments = cv2.moments(component.contour)
     if moments["mu02"] <= 0:
@@ -150,7 +166,10 @@ def measure_stroke_widths_px(inkMask: np.ndarray) -> np.ndarray:
     Its local maxima run along stroke centres, where the stroke width is about 2 x distance - 1.
     """
     distancePx = cv2.distanceTransform((inkMask > 0).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_5)
+    # Local-maximum trick: dilate replaces each value with the largest in its 3x3 neighbourhood, so a pixel
+    # equal to its dilated value is a peak: the centre line ("ridge") of a stroke
     isRidge = (distancePx > 0) & (distancePx >= cv2.dilate(distancePx, np.ones((3, 3), np.uint8)))
+    # A centre pixel d px from the paper on both sides spans d + d - 1 px (it is counted on both sides)
     return 2 * distancePx[isRidge] - 1
 
 

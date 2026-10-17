@@ -1,3 +1,10 @@
+"""Turn the ten raw measurements into eight 0-1 feature scores, one 0-100 legibilityScore and a label.
+
+1. Each measurement goes through its curve (scoring_config.py) to a 0-1 score.
+2. Each feature takes its measurement's score; shapeConsistency averages its three measurements.
+3. legibilityScore = 100 x weighted average of the available feature scores. Missing features are
+   left out (weights rescaled to sum to 1) rather than counted as 0 or as perfect.
+"""
 import math
 
 from typing import Optional

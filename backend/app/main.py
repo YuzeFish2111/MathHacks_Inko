@@ -255,7 +255,12 @@ async def analyze(
     pageHeightMm: float = Form(...),
     cornerPointsPx: Optional[str] = Form(None),
 ) -> dict:
-    """Photo in, legibility estimate out. Every step either passes a quality check or stops with a retry message."""
+    """Photo in, legibility estimate out. Every step either passes a quality check or stops with a retry message.
+
+    `async` lets the server keep handling other requests while this one waits for the upload to arrive.
+    Flow: check the upload -> find and flatten the page -> ink, contrast, blur and segmentation checks
+    -> 10 measurements -> 8 feature scores -> final score, overlays and tips.
+    """
     fields = parse_request_fields(pageWidthMm, pageHeightMm, cornerPointsPx)
     qualityChecks: list[dict] = []
     warnings: list[str] = []

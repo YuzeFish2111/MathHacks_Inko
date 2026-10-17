@@ -115,3 +115,77 @@ Remaining backend work
 Notes
   - data/ is committed to a public GitHub repo; move any handwriting that isn't the team's own to
     validation/samples/ (git-ignored) and get consent first.
+
+
+FILE SUMMARIES
+==============
+What each file does, in the order data flows through the app. Start with main.py to follow one request.
+
+Root
+  MathHacks-vibe-coding-plan.md  The full project plan: goals, user flow, build steps, naming contract,
+                                 validation method. The source of truth for names and scope.
+  instructions.txt               Step-by-step guide for people taking handwriting photos (paper, pen,
+                                 lighting, framing) and what each "retake" message means.
+  project-structure.txt          This file: folder map, backend progress tracker, file summaries.
+  .gitignore                     Keeps caches, secrets and private validation photos out of git.
+  data/                          The team's first real test photos (public on GitHub).
+
+backend/app/  (the API; every request goes main.py -> image_pipeline -> measurements -> scoring
+               -> advice / issues -> schemas)
+  main.py                FastAPI server. POST /api/analyze takes a photo and the paper size, runs every
+                         quality check in order (file type, size, decoding, resolution, page edges, ink,
+                         contrast, blur, segmentation), then measures, scores and returns overlays and tips.
+                         Any failed check returns a friendly "needs_better_photo" message instead of a
+                         misleading score. GET /api/health confirms the server is running.
+  image_pipeline.py      Computer vision. Finds the page automatically (brightness or edges, then a
+                         4-corner shape check), flattens it with a perspective transform, evens out
+                         shadows (divides by an estimate of the bare paper), straightens tilted writing
+                         (the angle with the sharpest row-by-row ink profile), separates ink from paper
+                         (adaptive threshold), removes specks, finds text lines and letter candidates,
+                         and labels each blob as letter, mark (dot/punctuation) or cluster (joined letters).
+                         Also measures photo contrast and edge sharpness for the blur check.
+  measurements.py        The ten raw measurements: text size, x-height, baseline variation, letter shape
+                         variation (proportions, solidity, slant), stroke width and stroke contrast
+                         (distance transform), letter spacing and spacing variation. Uses robust
+                         statistics (medians, Theil-Sen, MAD) so a few odd letters don't skew results.
+                         Unknown values are null, never 0.
+  scoring_config.py      Every tunable number in one place: feature list, which measurement feeds which
+                         feature, scoring curves, weights, score bands and all pipeline thresholds.
+  scoring.py             Turns measurements into eight 0-1 feature scores (sweet-spot and decreasing
+                         curves), a 0-100 legibilityScore (weighted average of available features only)
+                         and a label ("Very legible" ... "Hard to read").
+  advice.py              Up to three practice tips for the weakest features, each naming the measured
+                         value, the direction to change and an exercise.
+  issues.py              Marks problem areas on the overlay: letters off the baseline, leaning letters,
+                         uneven or too-tight gaps, joined letters, plus page-wide size/stroke problems.
+  schemas.py             The response format (Pydantic). Rejects unknown fields and contradictions
+                         (e.g. an error with a score), so the API can't drift from the contract.
+  accuracy_evaluation.py Teammate's OCR experiment: how confidently EasyOCR reads the writing, as a
+                         0-100 score. Runs on its own; not yet part of /api/analyze.
+  fit_weights.py         Placeholder for fitting the feature weights to human ratings.
+  __init__.py            Marks app/ as a Python package (empty on purpose).
+
+backend/scripts/  (developer tools, run by hand)
+  preprocessing.py       Teammate's step-by-step preprocessing walkthrough with plots; opens HEIC photos.
+  preview_ink_mask.py    Shows a photo next to its ink mask, for checking thresholds by eye.
+
+backend/tests/  (85 automated tests; run with: cd backend && python3 -m pytest)
+  test_api.py            Uploads real requests: complete results, page detection, every error code.
+  test_image_pipeline.py Lines, letters, deskew, page detection, lighting correction, contrast, sharpness.
+  test_measurements.py   Each measurement on drawn shapes with known answers (e.g. 40 px = 4.0 mm).
+  test_scoring.py        Curves, missing features, weight rescaling, score bands, rounding.
+  test_advice.py         Tip selection, wording, weakest-first order, at most three.
+  test_issues.py         Overlay marks: floating/sunk letters, descenders left alone, leaning letters, gaps.
+  test_schemas.py        Example responses match the schema; TypeScript and Python field names match.
+
+backend/requirements.txt  Python packages to install: pip install -r backend/requirements.txt
+
+frontend/src/types/analysis.ts  The same response format as schemas.py, for the React app (not started).
+
+shared/
+  analysis-contract.md   The agreed names, units, error codes and API shape shared by frontend and backend.
+  fixtures/*.json        Example "complete" and "needs_better_photo" responses both sides test against.
+
+validation/  (for checking the score against people; not started)
+  ratings.csv            Blind human ratings, one row per sample per rater (header only so far).
+  analysis.ipynb         Will hold rater agreement (ICC), correlation with the app's score, weight fitting.

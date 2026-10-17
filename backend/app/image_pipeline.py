@@ -1,3 +1,15 @@
+"""Image processing: from a phone photo to a clean ink mask, text lines and letter candidates.
+
+Order used by POST /api/analyze (main.py):
+  decode -> find the page (detect_page_corners) -> flatten it (rectify_page) -> grayscale
+  -> lighting correction (normalize_illumination) -> straighten (deskew) -> ink mask (threshold_ink)
+  -> remove specks (remove_small_components) -> lines (find_text_lines) -> letters (find_components)
+
+Conventions:
+  - Images are NumPy arrays. OpenCV stores colour as BGR (blue, green, red), not RGB.
+  - inkMask: 255 = ink, 0 = paper.
+  - Coordinates are pixels in the straightened page (rectifiedImage); x right, y DOWN.
+"""
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -74,6 +86,8 @@ def rectify_page(originalImage: np.ndarray, cornerPointsPx: list[tuple[float, fl
     if cv2.contourArea(sourceCorners) < 1:
         raise ValueError("cornerPointsPx enclose no area")
 
+    # A perspective transform (homography) is the 3x3 matrix that maps any four points onto any
+    # other four: here the photographed corners onto the corners of a flat, upright rectangle
     targetHeightPx = max(1, round(targetWidthPx * pageHeightMm / pageWidthMm))
     targetCorners = np.array([[0, 0], [targetWidthPx - 1, 0],
                               [targetWidthPx - 1, targetHeightPx - 1], [0, targetHeightPx - 1]], dtype=np.float32)
@@ -105,6 +119,7 @@ def _quad_from_contour(contour: np.ndarray) -> Optional[np.ndarray]:
     hull = cv2.convexHull(contour)
     perimeterPx = cv2.arcLength(hull, True)
     for toleranceRatio in (0.02, 0.03, 0.04, 0.05):
+        # Douglas-Peucker simplification: drops points that lie within the tolerance of a straight line
         polygon = cv2.approxPolyDP(hull, toleranceRatio * perimeterPx, True)
         if len(polygon) == 4:
             return polygon.reshape(4, 2).astype(np.float32)
@@ -120,10 +135,13 @@ def _candidate_page_masks(grayscaleImage: np.ndarray):
     """
     blurredImage = cv2.GaussianBlur(grayscaleImage, (5, 5), 0)
 
+    # Otsu's method picks the brightness cut-off that best splits the pixels into two groups
+    # (paper vs. background), so no fixed threshold is needed
     _, brightMask = cv2.threshold(blurredImage, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     yield cv2.morphologyEx(brightMask, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
 
     medianLevel = float(np.median(blurredImage))
+    # Canny edge thresholds set from the image's own median brightness (a common rule of thumb)
     edges = cv2.Canny(blurredImage, 0.66 * medianLevel, 1.33 * medianLevel)
     yield cv2.dilate(edges, np.ones((5, 5), np.uint8))
 
@@ -211,7 +229,13 @@ def normalize_illumination(grayscaleImage: np.ndarray) -> np.ndarray:
 
 
 def threshold_ink(grayscaleImage: np.ndarray) -> np.ndarray:
-    """Blur slightly, then adaptive-threshold into an ink mask (ink = 255, paper = 0)."""
+    """Blur slightly, then adaptive-threshold into an ink mask (ink = 255, paper = 0).
+
+    Adaptive thresholding compares each pixel with the (Gaussian-weighted) average of the
+    THRESHOLD_BLOCK_SIZE_PX x THRESHOLD_BLOCK_SIZE_PX square around it: a pixel counts as ink if it is
+    more than THRESHOLD_OFFSET_C darker than its neighbourhood. Unlike one global cut-off, this still
+    works if some brightness variation is left after lighting correction.
+    """
     blurredImage = cv2.GaussianBlur(grayscaleImage, (BLUR_KERNEL_PX, BLUR_KERNEL_PX), 0)
     return cv2.adaptiveThreshold(
         blurredImage,
@@ -225,9 +249,12 @@ def threshold_ink(grayscaleImage: np.ndarray) -> np.ndarray:
 
 def remove_small_components(inkMask: np.ndarray, minAreaPx: int = MIN_COMPONENT_AREA_PX) -> np.ndarray:
     """Drop connected ink components smaller than minAreaPx (isolated noise)."""
+    # Connected components: every separate blob of touching ink pixels (diagonals count, so
+    # connectivity=8) gets its own number in `labels`; componentStats holds each blob's box and area
     _, labels, componentStats, _ = cv2.connectedComponentsWithStats(inkMask, connectivity=8)
-    keep = componentStats[:, cv2.CC_STAT_AREA] >= minAreaPx
+    keep = componentStats[:, cv2.CC_STAT_AREA] >= minAreaPx    # one True/False per blob number
     keep[0] = False    # label 0 is the paper background
+    # keep[labels] looks up every pixel's blob number in `keep`: a True/False image in one step, no loop
     return np.where(keep[labels], 255, 0).astype(np.uint8)
 
 
@@ -260,6 +287,7 @@ def measure_edge_sharpness(grayscaleImage: np.ndarray, inkMask: np.ndarray,
     gradientY = cv2.Sobel(imageFloat, cv2.CV_32F, 0, 1, ksize=3) / 8
     gradientMagnitude = np.hypot(gradientX, gradientY)
 
+    # Morphological gradient (grown mask minus shrunk mask) = a thin band on both sides of every stroke edge
     isEdge = cv2.morphologyEx(inkMask, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0
     if not isEdge.any():
         return None
@@ -275,6 +303,7 @@ def rotate_image(image: np.ndarray, angleDeg: float, borderMode: int = cv2.BORDE
     """
     heightPx, widthPx = image.shape[:2]
     center = (widthPx / 2, heightPx / 2)
+    # 2x3 affine matrix [[cos, sin, shiftX], [-sin, cos, shiftY]]: rotates about the centre, then shifts
     rotationMatrix = cv2.getRotationMatrix2D(center, angleDeg, 1.0)
 
     # Size of the box that fits the whole rotated image
@@ -305,6 +334,8 @@ def estimate_deskew_angle_deg(inkMask: np.ndarray) -> float:
     bestAngleDeg = 0.0
     bestScore = -1.0
     for angleDeg in candidateAnglesDeg:
+        # Projection profile: ink pixels per row. Tilted text smears ink across many rows (flat profile);
+        # level text concentrates it in its rows (tall peaks, empty valleys), which gives a high variance
         rowInkCounts = (rotate_image(inkMask, angleDeg) > 127).sum(axis=1)
         score = float(np.var(rowInkCounts))
         if score > bestScore:
@@ -342,6 +373,7 @@ def find_text_lines(inkMask: np.ndarray) -> list[TextLine]:
     if rowInkCounts.max() == 0:
         return []
 
+    # Same projection-profile idea as deskew: rows of writing hold lots of ink, gaps between lines hold none.
     # Rows with enough ink count as text; group consecutive text rows into bands [top, bottom]
     isTextRow = rowInkCounts >= max(1, LINE_MIN_INK_FRACTION * rowInkCounts.max())
     bands = []
@@ -370,7 +402,8 @@ def find_components(inkMask: np.ndarray, textLines: list[TextLine]) -> list[Text
     for label in range(1, count):    # label 0 is the paper background
         xPx, yPx, widthPx, heightPx, areaPx = (int(v) for v in componentStats[label])
 
-        # Vertical overlap with each line; negative values are the gap to that line
+        # Vertical overlap with each line: (lower of the two bottoms) - (higher of the two tops) + 1.
+        # Positive = rows shared with the line; negative = the gap to that line
         overlaps = [min(yPx + heightPx - 1, line.bottomPx) - max(yPx, line.topPx) + 1
                     for line in textLines]
         line = textLines[int(np.argmax(overlaps))]    # most overlap, or else the nearest line

@@ -1,3 +1,22 @@
+"""Every tunable number in the project lives here, so the scoring is transparent and easy to adjust.
+
+How a raw measurement becomes a 0-1 feature score:
+
+  Sweet-spot (trapezoid) curve (a, b, c, d), used when "too small" and "too big" are both bad:
+
+      score 1 |        b________c
+              |       /          \
+              |      /            \
+      score 0 |_____a              d_____
+                       measurement ->
+
+  Decreasing curve (v0, v1), used for variation, where less is always better:
+      score 1 at or below v0, falling in a straight line to 0 at v1 and above.
+
+All curve values and weights are first guesses (placeholders). The plan is to check them against
+blind human ratings (backend/app/fit_weights.py) before claiming the score is calibrated.
+"""
+
 FEATURE_IDS = ("textSize", "xHeight", "baselineConsistency", "shapeConsistency",
                "strokeContrast", "strokeWeight", "letterSpacing", "spacingConsistency")
 
@@ -13,6 +32,8 @@ FEATURE_SOURCES = {
     "spacingConsistency":  ("letterSpacingCv",),
 }
 
+# Equal weights (1/8 each) until human ratings exist; the final score is the weighted average of the
+# available feature scores, with weights rescaled to sum to 1 when some features can't be measured
 FEATURE_WEIGHTS = {featureId: 0.125 for featureId in FEATURE_IDS}   # replaced by regression later
 # After regression: FEATURE_WEIGHTS = {"textSize": 0.09, "xHeight": 0.21, ...}
 
