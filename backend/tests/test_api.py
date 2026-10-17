@@ -40,7 +40,7 @@ def error_code(response):
 
 
 def test_health():
-    assert client.get("/api/health").json() == {"status": "ok", "schemaVersion": "1.2"}
+    assert client.get("/api/health").json() == {"status": "ok", "schemaVersion": "1.3"}
 
 
 def test_complete_result_without_corners():

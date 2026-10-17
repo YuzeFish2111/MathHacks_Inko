@@ -37,7 +37,6 @@ MathHacks_Project/
 |   |   |-- [x] advice.py                weakest-first rule-based tips (templates per measurement + direction)
 |   |   `-- [ ] fit_weights.py           regression of weights against human ratings
 |   |-- scripts/
-|   |   |-- [x] preprocessing.py         teammate's preprocessing walkthrough: load (incl. HEIC), threshold, plot
 |   |   `-- [x] preview_ink_mask.py      debug tool: prints and plots the ink mask (needs matplotlib)
 |   `-- tests/
 |       |-- [x] test_image_pipeline.py   lines, components, deskew, contrast, sharpness, page detection,
@@ -158,9 +157,8 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
                          (adaptive threshold), removes specks, finds text lines and letter candidates,
                          and labels each blob as letter, mark (dot/punctuation) or cluster (joined letters).
                          Also measures photo contrast and edge sharpness for the blur check.
-  measurements.py        Ten of the eleven raw measurements (OCR adds the eleventh): text size,
-                         x-height, baseline variation, letter shape
-                         variation (proportions, solidity, slant), stroke width and stroke contrast
+  measurements.py        Eight of the nine raw measurements (OCR adds the ninth): text size,
+                         x-height, baseline variation, slant variation, stroke width and stroke contrast
                          (distance transform), letter spacing and spacing variation. Uses robust
                          statistics (medians, Theil-Sen, MAD) so a few odd letters don't skew results.
                          Unknown values are null, never 0.
@@ -182,7 +180,6 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
   __init__.py            Marks app/ as a Python package (empty on purpose).
 
 backend/scripts/  (developer tools, run by hand)
-  preprocessing.py       Teammate's step-by-step preprocessing walkthrough with plots; opens HEIC photos.
   preview_ink_mask.py    Shows a photo next to its ink mask, for checking thresholds by eye.
 
 backend/tests/  (95 automated tests; run with: cd backend && python3 -m pytest)

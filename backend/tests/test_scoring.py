@@ -1,5 +1,7 @@
 import math
 
+import app.scoring
+
 from app.scoring import (sweet_spot_score, decreasing_score, increasing_score, score_measurement,
                          compute_feature_scores, compute_legibility_score, score_label, score_measurements)
 from app.scoring_config import (FEATURE_IDS, FEATURE_SOURCES, FEATURE_WEIGHTS,
@@ -35,8 +37,8 @@ def test_missing_values_stay_null():
 # ---------- feature scores, legibilityScore, scoreLabel ----------
 
 PERFECT_MEASUREMENTS = {
-    "textSizeMm": 5.0, "xHeightMm": 3.0, "baselineVariationMm": 0.2, "aspectRatioCv": 0.05,
-    "solidityCv": 0.02, "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthMedianMm": 0.5,
+    "textSizeMm": 5.0, "xHeightMm": 3.0, "baselineVariationMm": 0.2,
+    "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthMedianMm": 0.5,
     "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1, "ocrConfidencePct": 95.0,
 }
 
@@ -63,9 +65,12 @@ def test_perfect_writing_scores_100():
     assert abs(sum(result["featureWeights"].values()) - 1) < 1e-9
 
 
-def test_shape_consistency_averages_only_available_sources():
-    measurements = dict(PERFECT_MEASUREMENTS, aspectRatioCv=0.45, solidityCv=None)   # 0.5 and missing
-    # slantStdDeg 1.0 -> 1.0, aspectRatioCv 0.45 -> 0.5, solidityCv ignored -> mean 0.75
+def test_feature_with_several_sources_averages_only_available_ones(monkeypatch):
+    # No feature has several sources since contract 1.3, but the averaging rule is kept; test it directly
+    monkeypatch.setitem(app.scoring.FEATURE_SOURCES, "shapeConsistency",
+                        ("slantStdDeg", "letterSpacingCv", "baselineVariationMm"))
+    measurements = dict(PERFECT_MEASUREMENTS, letterSpacingCv=0.575, baselineVariationMm=None)
+    # slantStdDeg 1.0 -> 1.0, letterSpacingCv 0.575 -> 0.5, baselineVariationMm ignored -> mean 0.75
     assert compute_feature_scores(measurements)["shapeConsistency"] == 0.75
 
 
@@ -77,8 +82,8 @@ def test_missing_features_are_excluded_not_counted_as_zero_or_perfect():
     assert missingFeatureIds == ["textSize", "xHeight"]
     assert set(featureWeights) == set(FEATURE_IDS) - {"textSize", "xHeight"}
     assert all(abs(weight - 1 / 7) < 1e-9 for weight in featureWeights.values())   # 1/9 renormalized over 7
-    # shapeConsistency = mean(1, 1, 0) = 2/3; the other six are 1 -> (6 + 2/3) / 7 = 95.2
-    assert legibilityScore == 95
+    # shapeConsistency (slant 25 degrees) = 0; the other six are 1 -> 6 / 7 = 85.7
+    assert legibilityScore == 86
 
 
 def test_no_features_gives_null_score():

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.2",
+  "schemaVersion": "1.3",
   "status": "complete",
   "error": null,
   "legibilityScore": 78,
@@ -10,8 +10,6 @@
     "textSizeMm": 6.2,
     "xHeightMm": 3.1,
     "baselineVariationMm": 0.8,
-    "aspectRatioCv": 0.24,
-    "solidityCv": 0.19,
     "slantStdDeg": 5.4,
     "strokeContrastRatio": 1.8,
     "strokeWidthMedianMm": 0.42,

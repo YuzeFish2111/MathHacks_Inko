@@ -29,11 +29,10 @@ def measure(inkMask, scaleMmPerPx=SCALE_MM_PER_PX):
     return compute_feature_measurements(inkMask, textLines, scaleMmPerPx, scaleMmPerPx)
 
 
-def test_returns_all_ten_canonical_keys():
+def test_returns_the_eight_image_measurements():
     assert list(measure(draw_letter_line())) == [
-        "textSizeMm", "xHeightMm", "baselineVariationMm", "aspectRatioCv", "solidityCv",
-        "slantStdDeg", "strokeContrastRatio", "strokeWidthMedianMm", "relativeLetterSpacing",
-        "letterSpacingCv"]
+        "textSizeMm", "xHeightMm", "baselineVariationMm", "slantStdDeg", "strokeContrastRatio",
+        "strokeWidthMedianMm", "relativeLetterSpacing", "letterSpacingCv"]
 
 
 def test_identical_letters_measure_as_perfectly_consistent():
@@ -41,8 +40,6 @@ def test_identical_letters_measure_as_perfectly_consistent():
     assert abs(m["textSizeMm"] - 4.0) < 1e-9                 # 40 px x 0.1 mm/px
     assert abs(m["xHeightMm"] - 4.0) < 1e-9
     assert m["baselineVariationMm"] == 0
-    assert abs(m["aspectRatioCv"]) < 1e-9
-    assert abs(m["solidityCv"]) < 1e-9
     assert abs(m["slantStdDeg"]) < 1e-9
     assert abs(m["relativeLetterSpacing"] - 10 / 40) < 1e-9  # word gap (50 px) is excluded
     assert m["letterSpacingCv"] == 0
@@ -78,7 +75,7 @@ def test_slant_varies_when_letters_lean_differently():
 def test_unknown_scale_gives_null_mm_values_but_keeps_the_rest():
     m = measure(draw_letter_line(), scaleMmPerPx=None)
     assert m["textSizeMm"] is None and m["xHeightMm"] is None and m["strokeWidthMedianMm"] is None
-    assert m["aspectRatioCv"] is not None and m["relativeLetterSpacing"] is not None
+    assert m["slantStdDeg"] is not None and m["relativeLetterSpacing"] is not None
 
 
 def test_too_little_writing_gives_null_not_zero():
@@ -87,7 +84,7 @@ def test_too_little_writing_gives_null_not_zero():
     inkMask[85:115, 55:65] = 0
     m = measure(inkMask)
     assert m["textSizeMm"] is None
-    assert m["aspectRatioCv"] is None
+    assert m["slantStdDeg"] is None
     assert m["letterSpacingCv"] is None
 
 

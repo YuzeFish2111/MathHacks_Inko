@@ -48,8 +48,6 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `textSizeMm` | Median candidate component height, mm |
 | `xHeightMm` | Estimated lowercase-body height, mm |
 | `baselineVariationMm` | Std. deviation from fitted baseline, mm |
-| `aspectRatioCv` | CV of component width/height |
-| `solidityCv` | CV of component solidity |
 | `slantStdDeg` | Std. deviation of estimated slant, degrees |
 | `strokeContrastRatio` | 90th / 10th percentile stroke width |
 | `strokeWidthMedianMm` | Median stroke width, mm |
@@ -72,7 +70,7 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `textSize` | `textSizeMm` | sweet-spot |
 | `xHeight` | `xHeightMm` | sweet-spot |
 | `baselineConsistency` | `baselineVariationMm` | decreasing |
-| `shapeConsistency` | mean of `aspectRatioCv`, `solidityCv`, `slantStdDeg` | decreasing |
+| `shapeConsistency` | `slantStdDeg` | decreasing |
 | `strokeContrast` | `strokeContrastRatio` | decreasing |
 | `strokeWeight` | `strokeWidthMedianMm` | sweet-spot |
 | `letterSpacing` | `relativeLetterSpacing` | sweet-spot |
@@ -109,7 +107,9 @@ so `cornerPointsPx` and every overlay coordinate refer to that image. No extra f
 
 ### Response
 
-- `schemaVersion`: `"1.2"` (1.2 added `ocrReadability`, `ocrConfidencePct` and `recognizedText`).
+- `schemaVersion`: `"1.3"` (1.2 added `ocrReadability`, `ocrConfidencePct` and `recognizedText`;
+  1.3 removed `aspectRatioCv` and `solidityCv`, which mixed up letter identity with inconsistency,
+  so `shapeConsistency` now comes from `slantStdDeg` alone. This differs from the original plan).
 - `status`: `"complete"` or `"needs_better_photo"`.
 - `error`: `null`, or `{ "code": string, "message": string }`.
 - `qualityChecks` item: `{ "checkId": string, "passed": boolean, "message": string | null }`.

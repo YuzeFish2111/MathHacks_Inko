@@ -28,7 +28,7 @@ FEATURE_SOURCES = {
     "textSize":            ("textSizeMm",),
     "xHeight":             ("xHeightMm",),
     "baselineConsistency": ("baselineVariationMm",),
-    "shapeConsistency":    ("aspectRatioCv", "solidityCv", "slantStdDeg"),
+    "shapeConsistency":    ("slantStdDeg",),
     "strokeContrast":      ("strokeContrastRatio",),
     "strokeWeight":        ("strokeWidthMedianMm",),
     "letterSpacing":       ("relativeLetterSpacing",),
@@ -50,8 +50,6 @@ SWEET_SPOT_CURVES = {          # (a, b, c, d); placeholder values, not yet calib
 }
 DECREASING_CURVES = {          # (perfect value v0, zero-score value v1)
     "baselineVariationMm": (0.3, 2.5),
-    "aspectRatioCv":       (0.1, 0.8),
-    "solidityCv":          (0.05, 0.5),
     "slantStdDeg":         (2.0, 20.0),
     "strokeContrastRatio": (1.2, 4.0),
     "letterSpacingCv":     (0.15, 1.0),

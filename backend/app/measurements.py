@@ -116,26 +116,9 @@ def measure_baseline_variation_px(textLines: list[TextLine]) -> Optional[float]:
     return float(MAD_TO_STD * np.median(np.abs(residualsPx - np.median(residualsPx))))
 
 
-# ---------- 3. shape consistency ----------
-
-def measure_aspect_ratio_cv(textLines: list[TextLine]) -> Optional[float]:
-    """CV of letter width / height."""
-    return _cv([component.widthPx / component.heightPx for component in _letters(textLines)])
-
-
-def measure_solidity_cv(textLines: list[TextLine]) -> Optional[float]:
-    """CV of letter solidity (outline area / convex hull area).
-
-    The convex hull is the shape a rubber band would make around the letter. Solidity near 1 = a
-    compact shape (o, e); lower = open or spiky (k, x). Varied solidity = letters formed inconsistently.
-    """
-    solidities = []
-    for component in _letters(textLines):
-        hullAreaPx = cv2.contourArea(cv2.convexHull(component.contour))
-        if hullAreaPx > 0:
-            solidities.append(cv2.contourArea(component.contour) / hullAreaPx)
-    return _cv(solidities)
-
+# ---------- 3. shape consistency (slant) ----------
+# Width/height and solidity spreads were removed in contract 1.3: they mixed up letter identity
+# (an l and an o naturally differ) with inconsistency, so even perfect writing scored badly.
 
 def letter_slant_deg(component: LetterComponent) -> Optional[float]:
     """One letter's slant in degrees (0 = upright), or None for a shape with no height.
@@ -237,7 +220,7 @@ def measure_letter_spacing_cv(letterGapsPx: list[float]) -> Optional[float]:
 def compute_feature_measurements(inkMask: np.ndarray, textLines: list[TextLine],
                                  scaleMmPerPxX: Optional[float],
                                  scaleMmPerPxY: Optional[float]) -> dict[str, Optional[float]]:
-    """Return featureMeasurements with all ten canonical keys.
+    """Return the eight measurements computed from the image (OCR adds ocrConfidencePct).
 
     mm values are None when the scale is unknown; unitless values and degrees are still measured.
     """
@@ -250,8 +233,6 @@ def compute_feature_measurements(inkMask: np.ndarray, textLines: list[TextLine],
         "textSizeMm":            _to_mm(measure_text_size_px(textLines), scaleMmPerPxY),
         "xHeightMm":             _to_mm(xHeightPx, scaleMmPerPxY),
         "baselineVariationMm":   _to_mm(measure_baseline_variation_px(textLines), scaleMmPerPxY),
-        "aspectRatioCv":         measure_aspect_ratio_cv(textLines),
-        "solidityCv":            measure_solidity_cv(textLines),
         "slantStdDeg":           measure_slant_std_deg(textLines),
         "strokeContrastRatio":   measure_stroke_contrast_ratio(strokeWidthsPx),
         "strokeWidthMedianMm":   _to_mm(measure_stroke_width_median_px(strokeWidthsPx), scaleMmPerPxMean),

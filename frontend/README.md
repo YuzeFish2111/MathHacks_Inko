@@ -34,7 +34,7 @@ uvicorn app.main:app --reload
 ```
 
 Check it's running:
-- http://127.0.0.1:8000/api/health should show `{"status":"ok","schemaVersion":"1.2"}`
+- http://127.0.0.1:8000/api/health should show `{"status":"ok","schemaVersion":"1.3"}`
 - http://127.0.0.1:8000/docs lets you upload a photo by hand and see the real response
 
 Keep this terminal open while you work on the frontend.
@@ -273,7 +273,7 @@ changes that file, update this table and the constants file together.
 | `textSize` | Letter size | `textSizeMm` | mm | 3.0-7.0 |
 | `xHeight` | Small-letter height | `xHeightMm` | mm | 2.0-4.5 |
 | `baselineConsistency` | Staying on the line | `baselineVariationMm` | mm | 0.3 or less |
-| `shapeConsistency` | Consistent letter shapes | `slantStdDeg` (also `aspectRatioCv`, `solidityCv`) | degrees | 2 or less |
+| `shapeConsistency` | Consistent slant | `slantStdDeg` | degrees | 2 or less |
 | `strokeContrast` | Even pen pressure | `strokeContrastRatio` | x (ratio) | 1.2 or less |
 | `strokeWeight` | Pen thickness | `strokeWidthMedianMm` | mm | 0.3-0.8 |
 | `letterSpacing` | Space between letters | `relativeLetterSpacing` | x letter height | 0.15-0.6 |

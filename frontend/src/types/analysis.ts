@@ -2,7 +2,7 @@
 // Must match backend/app/schemas.py field-for-field; see shared/analysis-contract.md.
 // null means "could not be estimated"; 0 is a real measurement.
 
-export const SCHEMA_VERSION = "1.2"; // 1.2 added OCR: ocrReadability, ocrConfidencePct, recognizedText
+export const SCHEMA_VERSION = "1.3"; // 1.2 added OCR; 1.3 removed aspectRatioCv and solidityCv
 
 export type FeatureId =
   | "textSize"
@@ -66,13 +66,11 @@ export interface QualityCheck {
   message: string | null;
 }
 
-/** The eleven raw measurements. */
+/** The nine raw measurements. */
 export interface FeatureMeasurements {
   textSizeMm: number | null;
   xHeightMm: number | null;
   baselineVariationMm: number | null;
-  aspectRatioCv: number | null;
-  solidityCv: number | null;
   slantStdDeg: number | null;
   strokeContrastRatio: number | null;
   strokeWidthMedianMm: number | null;
@@ -138,7 +136,7 @@ export interface AdviceItem {
 // ---------- full response ----------
 
 export interface AnalysisResponse {
-  schemaVersion: "1.2";
+  schemaVersion: "1.3";
   status: AnalysisStatus;
   error: AnalysisError | null;
   /** Final 0-100 score, or null. */

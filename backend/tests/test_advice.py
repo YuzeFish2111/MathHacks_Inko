@@ -7,8 +7,8 @@ from app.scoring import compute_feature_scores
 from app.scoring_config import SWEET_SPOT_CURVES, DECREASING_CURVES, INCREASING_CURVES, FEATURE_SOURCES, MAX_ADVICE_ITEMS
 
 PERFECT_MEASUREMENTS = {
-    "textSizeMm": 5.0, "xHeightMm": 3.0, "baselineVariationMm": 0.2, "aspectRatioCv": 0.05,
-    "solidityCv": 0.02, "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthMedianMm": 0.5,
+    "textSizeMm": 5.0, "xHeightMm": 3.0, "baselineVariationMm": 0.2,
+    "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthMedianMm": 0.5,
     "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1, "ocrConfidencePct": 95.0,
 }
 
@@ -53,7 +53,7 @@ def test_message_includes_the_measured_value_as_a_percent():
 
 
 def test_shape_consistency_describes_its_weakest_source():
-    tip = advice_for(slantStdDeg=15.0)[0]                   # aspect and solidity are perfect
+    tip = advice_for(slantStdDeg=15.0)[0]
     assert tip["featureId"] == "shapeConsistency"
     assert tip["title"] == "Keep a steady slant"
 
