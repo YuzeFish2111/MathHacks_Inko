@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 from fastapi.testclient import TestClient
 
+import app.main as mainModule
+from app.accuracy_evaluation import OcrResult
 from app.main import app
 from app.schemas import AnalysisResponse
 from app.scoring_config import MAX_UPLOAD_BYTES
@@ -211,3 +213,28 @@ def test_prepare_page_keeps_canvas_dimensions_before_deskew(monkeypatch):
     assert (height, width) == (1414, 1000)
     assert page.shape == (1434, 1040)
     assert bounds is False
+
+
+def test_recognized_text_is_shown_but_never_changes_the_score(monkeypatch):
+    baseline = post(png_bytes(make_page_photo())).json()        # conftest: OCR unavailable
+
+    fakeResult = OcrResult(confidencePct=5.0, recognizedText="The quick brown fox\njumps over the lazy dog.",
+                           detections=[([[0, 0], [400, 0], [400, 600], [0, 600]], "The quick", 0.05)])
+    monkeypatch.setattr(mainModule, "read_handwriting", lambda grayscaleImage: fakeResult)
+    body = post(png_bytes(make_page_photo())).json()
+    AnalysisResponse.model_validate(body)
+
+    assert body["recognizedText"] == "The quick brown fox\njumps over the lazy dog."
+    # Even a terrible OCR confidence leaves every score, weight, mark and tip exactly as without OCR
+    for field in ("legibilityScore", "scoreLabel", "featureScores", "featureWeights", "missingFeatureIds",
+                  "featureMeasurements", "overlayData", "advice"):
+        assert body[field] == baseline[field], field
+    assert not any("Text recognition" in warning for warning in body["warnings"])
+
+
+def test_api_still_works_when_ocr_is_unavailable():
+    body = post(png_bytes(make_page_photo())).json()          # conftest makes OCR unavailable
+    assert body["status"] == "complete" and body["legibilityScore"] is not None
+    assert body["recognizedText"] is None
+    assert "ocrReadability" not in body["featureScores"] and "ocrConfidencePct" not in body["featureMeasurements"]
+    assert sum(1 for warning in body["warnings"] if "Text recognition" in warning) == 1

@@ -1,14 +1,19 @@
-"""Preliminary OCR legibility score: how confidently EasyOCR can read the handwriting.
+"""Text recognition with EasyOCR: what a computer reads in the handwriting, and how confidently.
 
-Not yet part of POST /api/analyze; returning OCR results needs a contract change.
-OCR confidence is separate from the app's overall legibilityScore.
+POST /api/analyze calls read_handwriting() and returns its text as recognizedText, for display only:
+OCR never affects the score (OCR confidence isn't calibrated, and models can guess a famous sentence
+like the pangram even from messy writing). If EasyOCR isn't installed or its model can't load,
+read_handwriting() returns None and recognizedText is null.
 
-Run from the backend/ folder:
-    python -m app.accuracy_evaluation [image path]     (default: data/image0(37).heic at the project root)
+Run on its own from the backend/ folder:
+    python -m app.accuracy_evaluation <image path>     (e.g. a photo in tests/sample-images/)
 The first run downloads the EasyOCR model, so it needs internet access.
 HEIC photos (iPhone) need:  pip install pillow-heif
 """
+import logging
 import sys
+import threading
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NamedTuple, Optional
 
@@ -16,10 +21,9 @@ import cv2
 import numpy as np
 
 from .image_pipeline import load_image, to_grayscale, resize_to_width
+from .scoring_config import OCR_ENABLED, OCR_LANGUAGES
 
-# Found from this file's location, so it works from any folder
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_IMAGE_PATH = str(PROJECT_ROOT / "data" / "image0(37).heic")
+logger = logging.getLogger(__name__)
 
 
 # STEP 7A: Load the pretrained English OCR model.
@@ -27,10 +31,53 @@ DEFAULT_IMAGE_PATH = str(PROJECT_ROOT / "data" / "image0(37).heic")
 # Load this once and reuse it when processing multiple images.
 def load_reader():
     import easyocr
-    return easyocr.Reader(["en"], gpu=False)
+    return easyocr.Reader(list(OCR_LANGUAGES), gpu=False)
 
 
-class OcrResult(NamedTuple):
+# The server shares one model: loading it takes seconds (and downloads it on first use), so it is
+# loaded on the first request and reused. A failed load is remembered so every request doesn't retry.
+_reader = None
+_readerLoadFailed = False
+_readerLock = threading.Lock()    # one OCR at a time: the model isn't built for parallel calls
+
+
+def get_reader():
+    """The shared EasyOCR reader, or None if OCR is disabled or can't be loaded."""
+    global _reader, _readerLoadFailed
+    if not OCR_ENABLED or _readerLoadFailed:
+        return None
+    if _reader is None:
+        try:
+            _reader = load_reader()
+        except Exception:    # not installed, no internet for the model download, certificate problems...
+            logger.exception("EasyOCR could not be loaded; recognizedText will be null")
+            _readerLoadFailed = True
+            return None
+    return _reader
+
+
+@dataclass
+class OcrResult:
+    confidencePct: Optional[float]    # character-weighted confidence, 0-100; None if no text was found
+    recognizedText: str               # what the model read, one detected region per line
+    detections: list                  # raw (boundingBox, text, confidence 0-1) tuples, in image pixels
+
+
+def read_handwriting(grayscaleImage: np.ndarray) -> Optional[OcrResult]:
+    """Run OCR on the straightened page. None if OCR is unavailable (the API then skips the feature).
+
+    Pass the same image the overlays refer to (rectifiedImage), so detection boxes line up with it.
+    """
+    with _readerLock:
+        reader = get_reader()
+        if reader is None:
+            return None
+        recognizedText, meanConfidence, _, detections = measure_handwriting_legibility(grayscaleImage, reader)
+    confidencePct = None if meanConfidence is None else 100.0 * meanConfidence
+    return OcrResult(confidencePct=confidencePct, recognizedText=recognizedText, detections=list(detections))
+
+
+class OcrConfidenceResult(NamedTuple):
     """OCR confidence is 0-1; ocrScore is the same confidence scaled to 0-100."""
 
     recognizedText: str
@@ -39,7 +86,7 @@ class OcrResult(NamedTuple):
     detections: list[Any]
 
 
-def measure_handwriting_legibility(gray_image, reader) -> OcrResult:
+def measure_handwriting_legibility(gray_image, reader) -> OcrConfidenceResult:
     """
     Recognize text and calculate a preliminary OCR legibility score.
 
@@ -85,7 +132,7 @@ def measure_handwriting_legibility(gray_image, reader) -> OcrResult:
     # No detection does not prove the handwriting deserves a score of zero.
     # It could also indicate an unsuitable photo or OCR failure.
     if total_characters == 0:
-        return OcrResult("", None, None, results)
+        return OcrConfidenceResult("", None, None, results)
 
     # Longer text regions contribute more than shorter regions.
     mean_confidence = weighted_confidence_sum / total_characters
@@ -98,7 +145,7 @@ def measure_handwriting_legibility(gray_image, reader) -> OcrResult:
     # Complex page layouts may need separate reading-order handling.
     recognized_text = "\n".join(text_parts)
 
-    return OcrResult(recognized_text, mean_confidence, legibility_score, results)
+    return OcrConfidenceResult(recognized_text, mean_confidence, legibility_score, results)
 
 
 def load_photo(path):
@@ -135,4 +182,6 @@ def main(path):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_IMAGE_PATH)
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python -m app.accuracy_evaluation <image path>")
+    main(sys.argv[1])

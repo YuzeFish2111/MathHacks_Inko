@@ -1,7 +1,7 @@
 """Debug tool: show the ink mask for one image.
 
 Run from the backend/ folder:
-    python -m scripts.preview_ink_mask ../data/handwriting3.png
+    python -m scripts.preview_ink_mask ../tests/sample-images/<photo>.jpg
 
 Needs matplotlib (pip install matplotlib); the API itself does not.
 """

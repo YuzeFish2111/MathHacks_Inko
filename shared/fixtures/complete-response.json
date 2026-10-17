@@ -5,12 +5,11 @@
   "legibilityScore": 78,
   "scoreLabel": "Readable",
   "rectifiedImage": "data:image/jpeg;base64,...",
+  "recognizedText": "The quick brown fox\njumps over the lazy dog.",
   "featureMeasurements": {
     "textHeightCanvasRatio": 0.020875420875420877,
     "xHeightTextRatio": 0.5,
     "baselineVariationRatio": 0.25806451612903225,
-    "aspectRatioCv": 0.24,
-    "solidityCv": 0.19,
     "slantStdDeg": 5.4,
     "strokeContrastRatio": 1.8,
     "strokeWidthRatio": 0.13548387096774192,

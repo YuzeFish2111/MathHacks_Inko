@@ -11,15 +11,16 @@ MathHacks_Project/
 |                                        validation/samples/)
 |-- [x] project-structure.txt            this file
 |-- [x] instructions.txt                 how users should take their handwriting photos
-|-- data/                                real test photos from the team (PUBLIC on GitHub; see note below)
+|-- [x] URGENT-TODO.md                   blockers before the next step, with owners
 |
 |-- backend/                             Python + FastAPI + OpenCV
+|   |-- [x] README.md                    full backend documentation (API, modules, config, tests)
 |   |-- [x] requirements.txt             numpy, opencv-python-headless, scipy, fastapi,
 |   |                                    python-multipart, pydantic, pytest, uvicorn, httpx,
 |   |                                    easyocr, matplotlib, pillow, pillow-heif
 |   |-- app/
-|   |   |-- [~] accuracy_evaluation.py   OCR confidence score with EasyOCR (teammate); runs on its own via
-|   |   |                                python -m app.accuracy_evaluation; NOT yet in /api/analyze
+|   |   |-- [x] accuracy_evaluation.py   EasyOCR text recognition (display only): shared model,
+|   |   |                                read_handwriting() used by /api/analyze; optional if it can't load
 |   |   |-- [x] __init__.py              marks app/ as a Python package (empty on purpose)
 |   |   |-- [x] main.py                  FastAPI app, POST /api/analyze, GET /api/health;
 |   |   |                                all 9 quality checks / error codes, overlays
@@ -37,7 +38,6 @@ MathHacks_Project/
 |   |   |-- [x] advice.py                weakest-first rule-based tips (templates per measurement + direction)
 |   |   `-- [ ] fit_weights.py           regression of weights against human ratings
 |   |-- scripts/
-|   |   |-- [x] preprocessing.py         teammate's preprocessing walkthrough: load (incl. HEIC), threshold, plot
 |   |   `-- [x] preview_ink_mask.py      debug tool: prints and plots the ink mask (needs matplotlib)
 |   `-- tests/
 |       |-- [x] test_image_pipeline.py   lines, components, deskew, contrast, sharpness, page detection,
@@ -45,13 +45,21 @@ MathHacks_Project/
 |       |-- [x] test_measurements.py     all ten measurements on synthetic images
 |       |-- [x] test_scoring.py          curves, feature scores, renormalized weights, bands
 |       |-- [x] test_schemas.py          fixtures vs schema; TS and Python field names match
+|       |-- [x] conftest.py              keeps the real OCR model out of tests (fakes are used instead)
+|       |-- [x] test_ocr.py              OCR confidence maths, load failure, disabled OCR
 |       |-- [x] test_issues.py           floating/sunk letters, descenders, lean, gaps, clusters, page marks
 |       |-- [x] test_advice.py           templates, direction, weakest-first, max three
 |       `-- [x] test_api.py              complete result, corners, every error code, HTTP 422
 |
-|-- frontend/                            React + TypeScript (not started; no package.json yet)
+|-- frontend/                            React + TypeScript (app not set up yet; no package.json)
+|   |-- [x] README.md                    step-by-step guide for frontend teammates
 |   `-- src/
 |       |-- components/
+|       |   `-- [x] RotateButton.tsx     "Rotate 90°" button for the preview/crop screen
+|       |-- hooks/
+|       |   `-- [x] useRotatablePhoto.ts keeps the chosen photo, its rotation and a preview URL
+|       |-- utils/
+|       |   `-- [x] rotateImage.ts       rotates the photo in the browser before upload; moves page corners
 |       |-- pages/
 |       |-- api/                         API client (analyze request)
 |       `-- types/
@@ -67,12 +75,13 @@ MathHacks_Project/
 |   `-- sample-images/                   hard cases collected during testing
 |
 `-- validation/
+    |-- [x] WEIGHT_FITTING_GUIDE.md      step-by-step guide: ratings -> ICC -> weight regression -> test-set report
     |-- samples/                         consented validation images (NOT public; git-ignored)
     |-- [~] ratings.csv                  header only: sampleId, raterId, rating, readingAccuracyPct
     `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results
 
 
-BACKEND PROGRESS  (85/85 tests passing; tested on synthetic images, first real photos tried)
+BACKEND PROGRESS  (92/92 tests passing; tested on synthetic images, first real photos tried)
 ================================================================
 Plan step                                   Status
 0. Lock contract                            [x] contract, fixtures, schemas.py, analysis.ts, drift tests
@@ -85,8 +94,9 @@ Plan step                                   Status
 6. API, overlays, validation                [~] /api/analyze complete; overlays mark problem letters and
                                                 gaps (issueFeatureIds); fit_weights.py and validation
                                                 analysis not started
-Extra: OCR accuracy score                   [~] app/accuracy_evaluation.py works standalone (model download
-                                                needs Mac certificates fixed); not in the API or contract
+Extra: OCR (contract 1.4)                   [x] display-only: recognizedText ("what a computer read");
+                                                never part of the score. Real model not yet run here
+                                                (Mac certificates)
 
 Contract coverage
   cornerPointsPx        [x] parsed, validated (4 points, inside photo), used to rectify the page;
@@ -96,7 +106,7 @@ Contract coverage
                             BLUR_TOO_HIGH, CONTRAST_TOO_LOW, PAGE_NOT_FOUND, NOT_ENOUGH_WRITING,
                             SEGMENTATION_UNCERTAIN
 
-Real-photo findings (data/, 5 photos)
+Real-photo findings (5 early team photos, since removed from the repo)
   - None followed the photo instructions (no page edges visible), so mm sizes were inflated and every
     score was "Hard to read" (35-48): artefacts of the photos, not the handwriting.
   - skibidi.jpeg is rotated 90 degrees; deskew only handles +/-15 degrees, so it measured sideways text.
@@ -109,12 +119,14 @@ Remaining backend work
   [ ] Endpoint that returns detected corners for the preview/crop screen (contract addition)
   [x] issueFeatureIds on overlay components and gaps
   [ ] fit_weights.py once validation ratings exist
-  [ ] Decide whether the OCR score joins /api/analyze (needs featureId + schemaVersion 1.2; easyocr pulls in PyTorch)
+  [x] OCR made display-only (recognizedText); removed from scoring in contract 1.4
+  [ ] Fix Mac certificates (Install Certificates.command) and run the real OCR model on test photos
   [ ] Optional: letter-level work (x-height consistency, comparison to an ideal example)
 
 Notes
-  - data/ is committed to a public GitHub repo; move any handwriting that isn't the team's own to
-    validation/samples/ (git-ignored) and get consent first.
+  - The early photos in data/ were removed from the repo. They remain in git history; if any weren't
+    the team's own handwriting, the history needs rewriting (e.g. git filter-repo) and a force-push.
+  - New test photos: tests/sample-images/ (team's own). Consented study photos: validation/samples/ (git-ignored).
 
 
 FILE SUMMARIES
@@ -124,11 +136,12 @@ What each file does, in the order data flows through the app. Start with main.py
 Root
   MathHacks-vibe-coding-plan.md  The full project plan: goals, user flow, build steps, naming contract,
                                  validation method. The source of truth for names and scope.
+  URGENT-TODO.md                 Blockers to clear before the next step (real photos, OCR certificates,
+                                 frontend setup, corner-preview decision, privacy, validation).
   instructions.txt               Step-by-step guide for people taking handwriting photos (paper, pen,
                                  lighting, framing) and what each "retake" message means.
   project-structure.txt          This file: folder map, backend progress tracker, file summaries.
   .gitignore                     Keeps caches, secrets and private validation photos out of git.
-  data/                          The team's first real test photos (public on GitHub).
 
 backend/app/  (the API; every request goes main.py -> image_pipeline -> measurements -> scoring
                -> advice / issues -> schemas)
@@ -144,8 +157,8 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
                          (adaptive threshold), removes specks, finds text lines and letter candidates,
                          and labels each blob as letter, mark (dot/punctuation) or cluster (joined letters).
                          Also measures photo contrast and edge sharpness for the blur check.
-  measurements.py        The ten raw measurements: text size, x-height, baseline variation, letter shape
-                         variation (proportions, solidity, slant), stroke width and stroke contrast
+  measurements.py        The eight raw measurements: text size,
+                         x-height, baseline variation, slant variation, stroke width and stroke contrast
                          (distance transform), letter spacing and spacing variation. Uses robust
                          statistics (medians, Theil-Sen, MAD) so a few odd letters don't skew results.
                          Unknown values are null, never 0.
@@ -160,16 +173,18 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
                          uneven or too-tight gaps, joined letters, plus page-wide size/stroke problems.
   schemas.py             The response format (Pydantic). Rejects unknown fields and contradictions
                          (e.g. an error with a score), so the API can't drift from the contract.
-  accuracy_evaluation.py Teammate's OCR experiment: how confidently EasyOCR reads the writing, as a
-                         0-100 score. Runs on its own; not yet part of /api/analyze.
+  accuracy_evaluation.py What EasyOCR reads on the straightened page, returned as recognizedText for
+                         display only (never scored). Loads the model once and shares it; if it can't
+                         load, recognizedText is null instead of the API failing.
   fit_weights.py         Placeholder for fitting the feature weights to human ratings.
   __init__.py            Marks app/ as a Python package (empty on purpose).
 
 backend/scripts/  (developer tools, run by hand)
-  preprocessing.py       Teammate's step-by-step preprocessing walkthrough with plots; opens HEIC photos.
   preview_ink_mask.py    Shows a photo next to its ink mask, for checking thresholds by eye.
 
-backend/tests/  (85 automated tests; run with: cd backend && python3 -m pytest)
+backend/tests/  (92 automated tests; run with: cd backend && python3 -m pytest)
+  conftest.py            Stops tests loading the real OCR model; tests that need OCR use a fake.
+  test_ocr.py            OCR confidence weighting, no-text case, model load failure, OCR switched off.
   test_api.py            Uploads real requests: complete results, page detection, every error code.
   test_image_pipeline.py Lines, letters, deskew, page detection, lighting correction, contrast, sharpness.
   test_measurements.py   Each measurement on drawn shapes with known answers (e.g. 40 px = 4.0 mm).
@@ -178,14 +193,24 @@ backend/tests/  (85 automated tests; run with: cd backend && python3 -m pytest)
   test_issues.py         Overlay marks: floating/sunk letters, descenders left alone, leaning letters, gaps.
   test_schemas.py        Example responses match the schema; TypeScript and Python field names match.
 
+backend/README.md         Full backend documentation: API, request flow, every module, settings,
+                          scoring model, tests, common tasks, troubleshooting, limitations.
 backend/requirements.txt  Python packages to install: pip install -r backend/requirements.txt
 
-frontend/src/types/analysis.ts  The same response format as schemas.py, for the React app (not started).
+frontend/README.md  Step-by-step guide for frontend teammates: setup, API call, every screen,
+                    overlays, phone testing, definition of done.
+frontend/src/  (React app not set up yet; these files are ready to plug in)
+  types/analysis.ts          The same response format as schemas.py, for the React app.
+  utils/rotateImage.ts       Turns the photo 90 degrees in the browser (canvas) before upload, and moves
+                             page corners to match. Always rotates the original, so quality is kept.
+  hooks/useRotatablePhoto.ts Remembers the chosen photo, how far it's turned, and a preview image URL.
+  components/RotateButton.tsx The "Rotate 90°" button (large tap target, screen-reader label).
 
 shared/
   analysis-contract.md   The agreed names, units, error codes and API shape shared by frontend and backend.
   fixtures/*.json        Example "complete" and "needs_better_photo" responses both sides test against.
 
 validation/  (for checking the score against people; not started)
+  WEIGHT_FITTING_GUIDE.md How to collect blind ratings, check rater agreement, fit the weights and report.
   ratings.csv            Blind human ratings, one row per sample per rater (header only so far).
   analysis.ipynb         Will hold rater agreement (ICC), correlation with the app's score, weight fitting.

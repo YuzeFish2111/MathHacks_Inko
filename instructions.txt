@@ -2,9 +2,9 @@ HOW TO TAKE YOUR HANDWRITING PHOTO
 
 Writing the sample
 1. Use plain white paper. Avoid lined, squared or coloured paper; the
-   printed lines can be mistaken for writing. A4 is the default size.
-   If your paper is a different size, enter its real width and height
-   in millimetres.
+   printed lines can be mistaken for writing. Paper dimensions are optional.
+   Enter the canvas width or height in millimetres only if you want physical
+   size warnings (letters below 2 mm or above 10 mm). Scores use image ratios.
 2. Use a dark pen (black or dark blue). A pencil is fine if it's dark.
    Avoid light pencil, coloured or metallic ink, and felt pens that bleed.
 3. Write this sentence, exactly as shown:

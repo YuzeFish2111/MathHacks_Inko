@@ -13,7 +13,9 @@ import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
+from starlette.concurrency import run_in_threadpool
 
+from .accuracy_evaluation import read_handwriting
 from .advice import generate_advice
 from .issues import find_component_issues, find_gap_issues
 from .image_pipeline import (decode_image, detect_page_corners, rectify_page, to_grayscale, resize_to_width,
@@ -61,6 +63,7 @@ def needs_better_photo_response(problem: PhotoProblem, qualityChecks: list[dict]
         "legibilityScore": None,
         "scoreLabel": None,
         "rectifiedImage": None,
+        "recognizedText": None,
         "featureMeasurements": None,
         "featureScores": None,
         "featureWeights": None,
@@ -291,12 +294,20 @@ async def analyze(
         warnings.append("Some features could not be measured and were left out of the score: "
                         + ", ".join(scoring["missingFeatureIds"]) + ".")
 
+    # OCR is display only ("what a computer read"); it never affects the score. It takes a second or two
+    # of CPU, so it runs in a worker thread instead of blocking the server for other requests.
+    ocrResult = await run_in_threadpool(read_handwriting, pageImage)
+    if ocrResult is None:
+        warnings.append("Text recognition isn't available on this server, so \"what a computer read\" "
+                        "can't be shown.")
+
     return {
         "schemaVersion": SCHEMA_VERSION,
         "status": "complete",
         "error": None,
         **scoring,
         "rectifiedImage": to_jpeg_data_url(pageImage),
+        "recognizedText": ocrResult.recognizedText if ocrResult else None,
         "featureMeasurements": featureMeasurements,
         "warnings": warnings,
         "qualityChecks": qualityChecks,

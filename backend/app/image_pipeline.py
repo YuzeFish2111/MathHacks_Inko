@@ -36,7 +36,7 @@ class LetterComponent:
     widthPx: int
     heightPx: int
     areaPx: int              # number of ink pixels
-    contour: np.ndarray      # outer outline from cv2.findContours; used for solidity and slant
+    contour: np.ndarray      # outer outline from cv2.findContours; used for slant
     kind: str = "letter"     # "letter" | "mark" (dot, punctuation) | "cluster" (joined letters)
 
 

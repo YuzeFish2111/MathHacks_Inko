@@ -51,12 +51,10 @@ class QualityCheck(ContractModel):
 
 
 class FeatureMeasurements(ContractModel):
-    """The ten raw measurements. None (null) means it could not be estimated; 0 is a real value."""
+    """The eight raw measurements. None (null) means it could not be estimated; 0 is a real value."""
     textHeightCanvasRatio: Optional[float]
     xHeightTextRatio: Optional[float]
     baselineVariationRatio: Optional[float]
-    aspectRatioCv: Optional[float]
-    solidityCv: Optional[float]
     slantStdDeg: Optional[float]
     strokeContrastRatio: Optional[float]
     strokeWidthRatio: Optional[float]
@@ -65,7 +63,7 @@ class FeatureMeasurements(ContractModel):
 
 
 class FeatureScores(ContractModel):
-    """featureId -> 0-1 normalizedScore, or None when the feature is missing. All eight keys are always sent."""
+    """featureId -> 0-1 normalizedScore, or None when the feature is missing. Every key is always sent."""
     textSize: Optional[float] = Field(ge=0, le=1)
     xHeight: Optional[float] = Field(ge=0, le=1)
     baselineConsistency: Optional[float] = Field(ge=0, le=1)
@@ -132,6 +130,7 @@ class AnalysisResponse(ContractModel):
     legibilityScore: Optional[int] = Field(ge=0, le=100)    # whole number for display; see scoring.py
     scoreLabel: Optional[str]
     rectifiedImage: Optional[str]    # data URL (PNG or JPEG) that overlayData refers to
+    recognizedText: Optional[str]    # what the OCR model read, display only; null if OCR is unavailable
     featureMeasurements: Optional[FeatureMeasurements]
     featureScores: Optional[FeatureScores]
     # Weights actually used, renormalized over available features; missing features are left out

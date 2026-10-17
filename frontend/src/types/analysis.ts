@@ -65,13 +65,11 @@ export interface QualityCheck {
   message: string | null;
 }
 
-/** The ten raw measurements. */
+/** The eight raw measurements. */
 export interface FeatureMeasurements {
   textHeightCanvasRatio: number | null;
   xHeightTextRatio: number | null;
   baselineVariationRatio: number | null;
-  aspectRatioCv: number | null;
-  solidityCv: number | null;
   slantStdDeg: number | null;
   strokeContrastRatio: number | null;
   strokeWidthRatio: number | null;
@@ -79,7 +77,7 @@ export interface FeatureMeasurements {
   letterSpacingCv: number | null;
 }
 
-/** featureId -> 0-1 normalizedScore, or null when missing. All eight keys are always sent. */
+/** featureId -> 0-1 normalizedScore, or null when missing. Every key is always sent. */
 export type FeatureScores = Record<FeatureId, number | null>;
 
 /** Weights actually used, renormalized over available features; missing features are left out. */
@@ -143,6 +141,8 @@ export interface AnalysisResponse {
   scoreLabel: string | null;
   /** Data URL (PNG or JPEG) of the rectified page that overlayData refers to. */
   rectifiedImage: string | null;
+  /** What the OCR model read, for display only (never part of the score); null if OCR is unavailable. */
+  recognizedText: string | null;
   featureMeasurements: FeatureMeasurements | null;
   featureScores: FeatureScores | null;
   featureWeights: FeatureWeights | null;

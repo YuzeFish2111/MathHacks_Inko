@@ -47,13 +47,12 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `textHeightCanvasRatio` | Median letter height / pre-deskew canvas height |
 | `xHeightTextRatio` | Estimated lowercase-body height / median letter height |
 | `baselineVariationRatio` | Robust baseline variation / lowercase-body height |
-| `aspectRatioCv` | CV of component width/height |
-| `solidityCv` | CV of component solidity |
 | `slantStdDeg` | Std. deviation of estimated slant, degrees |
 | `strokeContrastRatio` | 90th / 10th percentile stroke width |
 | `strokeWidthRatio` | Median stroke width / lowercase-body height |
 | `relativeLetterSpacing` | Median within-word letter gap / x-height; unitless |
 | `letterSpacingCv` | CV of within-word letter gaps |
+| `recognizedText` | What the OCR model read, shown to the user for interest only. **Never part of the score.** Null if OCR is unavailable |
 | `featureMeasurements` | Object containing the raw measurements above |
 | `featureScores` | Map featureId -> 0-1 normalized score or null |
 | `featureWeights` | Map featureId -> weight used (renormalized over available features) |
@@ -69,11 +68,15 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `textSize` | `textHeightCanvasRatio` | sweet-spot |
 | `xHeight` | `xHeightTextRatio` | sweet-spot |
 | `baselineConsistency` | `baselineVariationRatio` | decreasing |
-| `shapeConsistency` | mean of `aspectRatioCv`, `solidityCv`, `slantStdDeg` | decreasing |
+| `shapeConsistency` | `slantStdDeg` | decreasing |
 | `strokeContrast` | `strokeContrastRatio` | decreasing |
 | `strokeWeight` | `strokeWidthRatio` | sweet-spot |
 | `letterSpacing` | `relativeLetterSpacing` | sweet-spot |
 | `spacingConsistency` | `letterSpacingCv` | decreasing |
+
+OCR is display-only: it fills `recognizedText` and never changes any score, weight, mark or tip
+(its confidence isn't calibrated, and a model can guess the famous pangram even from messy writing).
+If EasyOCR isn't installed or its model can't load, `recognizedText` is null and a warning says so.
 
 ## Quality check IDs
 
@@ -95,6 +98,10 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `pageWidthMm` | optional | positive finite number; warning-only |
 | `pageHeightMm` | optional | positive finite number; warning-only |
 | `cornerPointsPx` | optional | JSON string `[[x,y],[x,y],[x,y],[x,y]]` in originalImage pixels, order top-left, top-right, bottom-right, bottom-left |
+
+Rotating the photo (the preview screen's "Rotate 90°" button) happens in the browser before upload
+(`frontend/src/utils/rotateImage.ts`). The backend only ever sees the uploaded, already-rotated image,
+so `cornerPointsPx` and every overlay coordinate refer to that image. No extra field is sent.
 
 ### Response
 - `schemaVersion`: `"2.0"`.

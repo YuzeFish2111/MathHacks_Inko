@@ -25,7 +25,7 @@ FEATURE_SOURCES = {
     "textSize":            ("textHeightCanvasRatio",),
     "xHeight":             ("xHeightTextRatio",),
     "baselineConsistency": ("baselineVariationRatio",),
-    "shapeConsistency":    ("aspectRatioCv", "solidityCv", "slantStdDeg"),
+    "shapeConsistency":    ("slantStdDeg",),
     "strokeContrast":      ("strokeContrastRatio",),
     "strokeWeight":        ("strokeWidthRatio",),
     "letterSpacing":       ("relativeLetterSpacing",),
@@ -34,7 +34,7 @@ FEATURE_SOURCES = {
 
 # Equal weights (1/8 each) until human ratings exist; the final score is the weighted average of the
 # available feature scores, with weights rescaled to sum to 1 when some features can't be measured
-FEATURE_WEIGHTS = {featureId: 0.125 for featureId in FEATURE_IDS}   # replaced by regression later
+FEATURE_WEIGHTS = {featureId: 1 / len(FEATURE_IDS) for featureId in FEATURE_IDS}   # replaced by regression later
 # After regression: FEATURE_WEIGHTS = {"textSize": 0.09, "xHeight": 0.21, ...}
 
 SWEET_SPOT_CURVES = {          # (a, b, c, d); placeholder values, not yet calibrated
@@ -45,8 +45,6 @@ SWEET_SPOT_CURVES = {          # (a, b, c, d); placeholder values, not yet calib
 }
 DECREASING_CURVES = {          # (perfect value v0, zero-score value v1)
     "baselineVariationRatio": (0.10, 0.80),
-    "aspectRatioCv":       (0.1, 0.8),
-    "solidityCv":          (0.05, 0.5),
     "slantStdDeg":         (2.0, 20.0),
     "strokeContrastRatio": (1.2, 4.0),
     "letterSpacingCv":     (0.15, 1.0),
@@ -66,6 +64,10 @@ ISSUE_SLANT_DEVIATION_DEG = 25.0   # letter leaning this much more/less than the
                                    # (upright but lopsided letters like h, r, b, d read up to ~17 degrees)
 ISSUE_GAP_DEVIATION_RATIO = 0.25   # letter gap differing from the median gap by this -> spacingConsistency
 # A gap outside the relativeLetterSpacing ideal range (sweet-spot b..c) is marked letterSpacing
+
+# Text recognition (backend/app/accuracy_evaluation.py): display only, never part of the score
+OCR_ENABLED = True              # False skips OCR: recognizedText is then null
+OCR_LANGUAGES = ("en",)
 
 # Upload and photo checks (backend/app/main.py)
 ALLOWED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence")  # MIME types accepted by the browser

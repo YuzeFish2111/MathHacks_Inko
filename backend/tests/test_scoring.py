@@ -1,7 +1,9 @@
 import math
 
-from app.scoring import (sweet_spot_score, decreasing_score, score_measurement, compute_feature_scores,
-                         compute_legibility_score, score_label, score_measurements)
+import app.scoring
+
+from app.scoring import (sweet_spot_score, decreasing_score, score_measurement,
+                         compute_feature_scores, compute_legibility_score, score_label, score_measurements)
 from app.scoring_config import (FEATURE_IDS, FEATURE_SOURCES, FEATURE_WEIGHTS,
                                 SWEET_SPOT_CURVES, DECREASING_CURVES)
 
@@ -35,16 +37,18 @@ def test_missing_values_stay_null():
 # ---------- feature scores, legibilityScore, scoreLabel ----------
 
 PERFECT_MEASUREMENTS = {
-    "textHeightCanvasRatio": 0.02, "xHeightTextRatio": 0.7, "baselineVariationRatio": 0.05, "aspectRatioCv": 0.05,
-    "solidityCv": 0.02, "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthRatio": 0.1,
+    "textHeightCanvasRatio": 0.02, "xHeightTextRatio": 0.7,
+    "baselineVariationRatio": 0.05, "slantStdDeg": 1.0,
+    "strokeContrastRatio": 1.1, "strokeWidthRatio": 0.1,
     "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1,
 }
 
 
 def test_every_source_measurement_has_exactly_one_curve():
     sources = {name for names in FEATURE_SOURCES.values() for name in names}
-    assert sources == set(SWEET_SPOT_CURVES) | set(DECREASING_CURVES)
-    assert not set(SWEET_SPOT_CURVES) & set(DECREASING_CURVES)
+    curves = [set(SWEET_SPOT_CURVES), set(DECREASING_CURVES)]
+    assert sources == set.union(*curves)
+    assert sum(len(curve) for curve in curves) == len(sources)        # no measurement has two curves
     assert set(FEATURE_SOURCES) == set(FEATURE_IDS) == set(FEATURE_WEIGHTS)
 
 
@@ -62,9 +66,12 @@ def test_perfect_writing_scores_100():
     assert abs(sum(result["featureWeights"].values()) - 1) < 1e-9
 
 
-def test_shape_consistency_averages_only_available_sources():
-    measurements = dict(PERFECT_MEASUREMENTS, aspectRatioCv=0.45, solidityCv=None)   # 0.5 and missing
-    # slantStdDeg 1.0 -> 1.0, aspectRatioCv 0.45 -> 0.5, solidityCv ignored -> mean 0.75
+def test_feature_with_several_sources_averages_only_available_ones(monkeypatch):
+    # No feature has several sources since contract 1.3, but the averaging rule is kept; test it directly
+    monkeypatch.setitem(app.scoring.FEATURE_SOURCES, "shapeConsistency",
+                        ("slantStdDeg", "letterSpacingCv", "baselineVariationRatio"))
+    measurements = dict(PERFECT_MEASUREMENTS, letterSpacingCv=0.575, baselineVariationRatio=None)
+    # slantStdDeg 1.0 -> 1.0, letterSpacingCv 0.575 -> 0.5, baselineVariationRatio ignored -> mean 0.75
     assert compute_feature_scores(measurements)["shapeConsistency"] == 0.75
 
 
@@ -75,9 +82,9 @@ def test_missing_features_are_excluded_not_counted_as_zero_or_perfect():
 
     assert missingFeatureIds == ["textSize", "xHeight"]
     assert set(featureWeights) == set(FEATURE_IDS) - {"textSize", "xHeight"}
-    assert all(abs(weight - 1 / 6) < 1e-9 for weight in featureWeights.values())   # 0.125 renormalized
-    # shapeConsistency = mean(1, 1, 0) = 2/3; the other five are 1 -> (5 + 2/3) / 6 = 94.4
-    assert legibilityScore == 94
+    assert all(abs(weight - 1 / 6) < 1e-9 for weight in featureWeights.values())   # 1/8 renormalized over 6
+    # shapeConsistency (slant 25 degrees) = 0; the other five are 1 -> 5 / 6 = 83.3
+    assert legibilityScore == 83
 
 
 def test_no_features_gives_null_score():

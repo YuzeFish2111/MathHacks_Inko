@@ -3,7 +3,7 @@
 Each tip comes from a template keyed by (measurement, direction):
 - sweet-spot measurements can be "low" (below the ideal range) or "high" (above it);
 - decreasing measurements (variation) can only be "high" (too uneven).
-shapeConsistency has three sources, so its tip describes whichever source scored worst.
+A feature with several sources gets a tip about whichever source scored worst.
 """
 from typing import Optional
 
@@ -39,16 +39,6 @@ ADVICE_TEMPLATES = {
         "title": "Keep letters on the line",
         "message": "Your letters drift up and down by about {value}% of lowercase body height from a straight baseline.",
         "exercise": "Write on lined paper and make the bottom of every letter touch the line.",
-    },
-    ("aspectRatioCv", "high"): {
-        "title": "Keep letter widths even",
-        "message": "Your letters' width-to-height proportions vary by {value}%.",
-        "exercise": "Practise rows of the same letter (o, n, m), making each copy the same width.",
-    },
-    ("solidityCv", "high"): {
-        "title": "Form letters the same way each time",
-        "message": "The shapes of your letters vary by {value}%, so the same letter can look different.",
-        "exercise": "Write each letter of the alphabet three times in a row and check that the copies match.",
     },
     ("slantStdDeg", "high"): {
         "title": "Keep a steady slant",
@@ -92,7 +82,7 @@ ADVICE_TEMPLATES = {
 # How each measurement's value is shown in a message: (multiplier, decimal places)
 DISPLAY_FORMATS = {
     "textHeightCanvasRatio": (100, 1), "xHeightTextRatio": (100, 1), "baselineVariationRatio": (100, 1),
-    "aspectRatioCv": (100, 0), "solidityCv": (100, 0), "slantStdDeg": (1, 0),
+    "slantStdDeg": (1, 0),
     "strokeContrastRatio": (1, 1), "strokeWidthRatio": (100, 1),
     "relativeLetterSpacing": (100, 0), "letterSpacingCv": (100, 0),
 }

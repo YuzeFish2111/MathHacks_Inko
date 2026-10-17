@@ -26,9 +26,9 @@ def measure(inkMask, canvasHeightPx=None):
     return compute_feature_measurements(inkMask, textLines, canvasHeightPx or inkMask.shape[0])
 
 
-def test_returns_all_ten_canonical_keys():
+def test_returns_the_eight_image_measurements():
     assert list(measure(draw_letter_line())) == [
-        "textHeightCanvasRatio", "xHeightTextRatio", "baselineVariationRatio", "aspectRatioCv", "solidityCv",
+        "textHeightCanvasRatio", "xHeightTextRatio", "baselineVariationRatio",
         "slantStdDeg", "strokeContrastRatio", "strokeWidthRatio", "relativeLetterSpacing",
         "letterSpacingCv"]
 
@@ -38,8 +38,6 @@ def test_identical_letters_measure_as_perfectly_consistent():
     assert abs(m["textHeightCanvasRatio"] - 0.2) < 1e-9                 # 40 px / 200 px canvas height
     assert abs(m["xHeightTextRatio"] - 1.0) < 1e-9
     assert m["baselineVariationRatio"] == 0
-    assert abs(m["aspectRatioCv"]) < 1e-9
-    assert abs(m["solidityCv"]) < 1e-9
     assert abs(m["slantStdDeg"]) < 1e-9
     assert abs(m["relativeLetterSpacing"] - 10 / 40) < 1e-9  # word gap (50 px) is excluded
     assert m["letterSpacingCv"] == 0
@@ -87,7 +85,6 @@ def test_too_little_writing_gives_null_not_zero():
     inkMask[85:115, 55:65] = 0
     m = measure(inkMask)
     assert m["textHeightCanvasRatio"] is None
-    assert m["aspectRatioCv"] is None
     assert m["letterSpacingCv"] is None
 
 

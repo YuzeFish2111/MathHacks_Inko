@@ -1,4 +1,4 @@
-"""The ten featureMeasurements.
+"""The eight featureMeasurements.
 
 Measurements use pixel ratios and degrees; physical dimensions are warning-only.
 Any measurement that cannot be estimated reliably is None (null), never 0.
@@ -118,26 +118,9 @@ def measure_baseline_variation_px(textLines: list[TextLine]) -> Optional[float]:
     return float(MAD_TO_STD * np.median(np.abs(residualsPx - np.median(residualsPx))))
 
 
-# ---------- 3. shape consistency ----------
-
-def measure_aspect_ratio_cv(textLines: list[TextLine]) -> Optional[float]:
-    """CV of letter width / height."""
-    return _cv([component.widthPx / component.heightPx for component in _letters(textLines)])
-
-
-def measure_solidity_cv(textLines: list[TextLine]) -> Optional[float]:
-    """CV of letter solidity (outline area / convex hull area).
-
-    The convex hull is the shape a rubber band would make around the letter. Solidity near 1 = a
-    compact shape (o, e); lower = open or spiky (k, x). Varied solidity = letters formed inconsistently.
-    """
-    solidities = []
-    for component in _letters(textLines):
-        hullAreaPx = cv2.contourArea(cv2.convexHull(component.contour))
-        if hullAreaPx > 0:
-            solidities.append(cv2.contourArea(component.contour) / hullAreaPx)
-    return _cv(solidities)
-
+# ---------- 3. shape consistency (slant) ----------
+# Width/height and solidity spreads were removed in contract 1.3: they mixed up letter identity
+# (an l and an o naturally differ) with inconsistency, so even perfect writing scored badly.
 
 def letter_slant_deg(component: LetterComponent) -> Optional[float]:
     """One letter's slant in degrees (0 = upright), or None for a shape with no height.
@@ -234,11 +217,11 @@ def measure_letter_spacing_cv(letterGapsPx: list[float]) -> Optional[float]:
     return _cv(letterGapsPx, minCount=MIN_GAPS_FOR_STATS)
 
 
-# ---------- all ten ----------
+# ---------- all eight ----------
 
 def compute_feature_measurements(inkMask: np.ndarray, textLines: list[TextLine],
                                  canvasHeightPx: int) -> dict[str, Optional[float]]:
-    """Return featureMeasurements with all ten canonical keys.
+    """Return featureMeasurements with all eight canonical keys.
 
     canvasHeightPx is the page height before deskew expands the image.
     """
@@ -251,8 +234,6 @@ def compute_feature_measurements(inkMask: np.ndarray, textLines: list[TextLine],
         "textHeightCanvasRatio":            _ratio(textHeightPx, canvasHeightPx),
         "xHeightTextRatio":             _ratio(xHeightPx, textHeightPx),
         "baselineVariationRatio":   _ratio(measure_baseline_variation_px(textLines), xHeightPx),
-        "aspectRatioCv":         measure_aspect_ratio_cv(textLines),
-        "solidityCv":            measure_solidity_cv(textLines),
         "slantStdDeg":           measure_slant_std_deg(textLines),
         "strokeContrastRatio":   measure_stroke_contrast_ratio(strokeWidthsPx),
         "strokeWidthRatio":   _ratio(measure_stroke_width_median_px(strokeWidthsPx), xHeightPx),
