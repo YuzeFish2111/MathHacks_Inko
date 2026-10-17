@@ -2,6 +2,7 @@ node_modules/
 .env
 .DS_Store
 __pycache__/
+.claude
 
 # Consented validation images: never commit
 validation/samples/*
