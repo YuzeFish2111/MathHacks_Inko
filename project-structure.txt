@@ -49,9 +49,14 @@ MathHacks_Project/
 |       |-- [x] test_advice.py           templates, direction, weakest-first, max three
 |       `-- [x] test_api.py              complete result, corners, every error code, HTTP 422
 |
-|-- frontend/                            React + TypeScript (not started; no package.json yet)
+|-- frontend/                            React + TypeScript (app not set up yet; no package.json)
 |   `-- src/
 |       |-- components/
+|       |   `-- [x] RotateButton.tsx     "Rotate 90°" button for the preview/crop screen
+|       |-- hooks/
+|       |   `-- [x] useRotatablePhoto.ts keeps the chosen photo, its rotation and a preview URL
+|       |-- utils/
+|       |   `-- [x] rotateImage.ts       rotates the photo in the browser before upload; moves page corners
 |       |-- pages/
 |       |-- api/                         API client (analyze request)
 |       `-- types/
@@ -180,7 +185,12 @@ backend/tests/  (85 automated tests; run with: cd backend && python3 -m pytest)
 
 backend/requirements.txt  Python packages to install: pip install -r backend/requirements.txt
 
-frontend/src/types/analysis.ts  The same response format as schemas.py, for the React app (not started).
+frontend/src/  (React app not set up yet; these files are ready to plug in)
+  types/analysis.ts          The same response format as schemas.py, for the React app.
+  utils/rotateImage.ts       Turns the photo 90 degrees in the browser (canvas) before upload, and moves
+                             page corners to match. Always rotates the original, so quality is kept.
+  hooks/useRotatablePhoto.ts Remembers the chosen photo, how far it's turned, and a preview image URL.
+  components/RotateButton.tsx The "Rotate 90°" button (large tap target, screen-reader label).
 
 shared/
   analysis-contract.md   The agreed names, units, error codes and API shape shared by frontend and backend.

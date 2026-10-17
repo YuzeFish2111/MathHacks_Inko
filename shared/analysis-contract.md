@@ -97,6 +97,10 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `pageHeightMm` | required | number |
 | `cornerPointsPx` | optional | JSON string `[[x,y],[x,y],[x,y],[x,y]]` in originalImage pixels, order top-left, top-right, bottom-right, bottom-left |
 
+Rotating the photo (the preview screen's "Rotate 90°" button) happens in the browser before upload
+(`frontend/src/utils/rotateImage.ts`). The backend only ever sees the uploaded, already-rotated image,
+so `cornerPointsPx` and every overlay coordinate refer to that image. No extra field is sent.
+
 ### Response
 
 - `status`: `"complete"` or `"needs_better_photo"`.
