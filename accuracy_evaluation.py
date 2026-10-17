@@ -1,8 +1,21 @@
+"""Preliminary OCR legibility score: how confidently EasyOCR can read the handwriting.
+
+Run:  python accuracy_evaluation.py [image path]    (default: same image as preprocessing.py)
+The first run downloads the EasyOCR model, so it needs internet access.
+"""
+import sys
+
+import numpy as np
+
+from preprocessing import DEFAULT_IMAGE_PATH, load_photo, preprocess
+
+
 # STEP 7A: Load the pretrained English OCR model.
 # gpu=False runs the model on the CPU.
-# The first run needs internet access to download the model.
 # Load this once and reuse it when processing multiple images.
-reader = easyocr.Reader(["en"], gpu=False)
+def load_reader():
+    import easyocr
+    return easyocr.Reader(["en"], gpu=False)
 
 
 def measure_handwriting_legibility(gray_image, reader):
@@ -69,29 +82,28 @@ def measure_handwriting_legibility(gray_image, reader):
     return recognized_text, mean_confidence, legibility_score, results
 
 
-# Store the score for later use in your overall handwriting rating.
-(
-    recognized_text,
-    ocr_confidence,
-    handwriting_accuracy_score,
-    ocr_results
-) = measure_handwriting_legibility(gray, reader)
+def main(path):
+    gray, _, _ = preprocess(load_photo(path))
+    reader = load_reader()
+
+    # Store the score for later use in your overall handwriting rating.
+    (
+        recognized_text,
+        ocr_confidence,
+        handwriting_accuracy_score,
+        ocr_results
+    ) = measure_handwriting_legibility(gray, reader)
+
+    print("\nOCR-predicted text:")
+    print(recognized_text if recognized_text else "[No text detected]")
+
+    if handwriting_accuracy_score is None:
+        print("Handwriting accuracy score: unavailable — no text detected.")
+    else:
+        print(f"Weighted OCR confidence: {ocr_confidence:.3f}")
+        print(f"Handwriting accuracy score: {handwriting_accuracy_score:.1f}/100")
+    return handwriting_accuracy_score
 
 
-print("\nOCR-predicted text:")
-print(recognized_text if recognized_text else "[No text detected]")
-
-if handwriting_accuracy_score is None:
-    print("Handwriting legibility score: unavailable")
-else:
-    print(f"Weighted OCR confidence: {ocr_confidence:.3f}")
-    print(
-        "Estimated handwriting legibility score:",
-        f"{handwriting_accuracy_score:.1f}/100"
-    )
-
-# Explicitly display the score stored for the final handwriting rating.
-if handwriting_accuracy_score is None:
-    print("Handwriting accuracy score: unavailable — no text detected.")
-else:
-    print(f"Handwriting accuracy score: {handwriting_accuracy_score:.1f}/100")
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_IMAGE_PATH)

@@ -8,3 +8,6 @@ pytest
 uvicorn
 httpx
 easyocr
+matplotlib
+pillow
+pillow-heif
