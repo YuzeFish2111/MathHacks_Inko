@@ -55,6 +55,8 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `strokeWidthMedianMm` | Median stroke width, mm |
 | `relativeLetterSpacing` | Median within-word letter gap / x-height; unitless |
 | `letterSpacingCv` | CV of within-word letter gaps |
+| `ocrConfidencePct` | How confidently a text-recognition model (EasyOCR) reads the writing, 0-100; null if OCR is unavailable or reads nothing |
+| `recognizedText` | What the OCR model read (shown to the user); null if OCR is unavailable |
 | `featureMeasurements` | Object containing the raw measurements above |
 | `featureScores` | Map featureId -> 0-1 normalized score or null |
 | `featureWeights` | Map featureId -> weight used (renormalized over available features) |
@@ -75,6 +77,10 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `strokeWeight` | `strokeWidthMedianMm` | sweet-spot |
 | `letterSpacing` | `relativeLetterSpacing` | sweet-spot |
 | `spacingConsistency` | `letterSpacingCv` | decreasing |
+| `ocrReadability` | `ocrConfidencePct` | increasing |
+
+OCR is optional: if EasyOCR isn't installed or its model can't load, `ocrReadability` is missing
+(listed in `missingFeatureIds`), the other features share its weight, and a warning says so.
 
 ## Quality check IDs
 
@@ -103,6 +109,7 @@ so `cornerPointsPx` and every overlay coordinate refer to that image. No extra f
 
 ### Response
 
+- `schemaVersion`: `"1.2"` (1.2 added `ocrReadability`, `ocrConfidencePct` and `recognizedText`).
 - `status`: `"complete"` or `"needs_better_photo"`.
 - `error`: `null`, or `{ "code": string, "message": string }`.
 - `qualityChecks` item: `{ "checkId": string, "passed": boolean, "message": string | null }`.
@@ -116,7 +123,8 @@ so `cornerPointsPx` and every overlay coordinate refer to that image. No extra f
     `baselineConsistency` (letter floats above or has sunk below its line; descenders are not marked),
     `shapeConsistency` (letter leans much more or less than the typical letter),
     `spacingConsistency` (letter gap much wider or narrower than the typical gap),
-    `letterSpacing` (letter gap outside the ideal range, or letters joined into a cluster).
+    `letterSpacing` (letter gap outside the ideal range, or letters joined into a cluster),
+    `ocrReadability` (letter inside a word the OCR model read with low confidence).
   - **Whole-page marks**: `textSize`, `xHeight`, `strokeWeight`, `strokeContrast` are added to every
     letter when that feature scores at or below the threshold. Draw these as a page-level state
     (e.g. tint all letters when that feature is selected), not as individual problem boxes.

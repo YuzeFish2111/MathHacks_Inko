@@ -13,7 +13,9 @@ import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
+from starlette.concurrency import run_in_threadpool
 
+from .accuracy_evaluation import read_handwriting
 from .advice import generate_advice
 from .issues import find_component_issues, find_gap_issues
 from .image_pipeline import (decode_image, detect_page_corners, rectify_page, to_grayscale, resize_to_width,
@@ -62,6 +64,7 @@ def needs_better_photo_response(problem: PhotoProblem, qualityChecks: list[dict]
         "legibilityScore": None,
         "scoreLabel": None,
         "rectifiedImage": None,
+        "recognizedText": None,
         "featureMeasurements": None,
         "featureScores": None,
         "featureWeights": None,
@@ -203,7 +206,7 @@ def segment_writing(grayscaleImage: np.ndarray, qualityChecks: list[dict]):
 
 # ---------- 7. Overlays: what the browser draws on top of rectifiedImage ----------
 
-def build_overlay_data(inkMask: np.ndarray, textLines, featureScores: dict) -> dict:
+def build_overlay_data(inkMask: np.ndarray, textLines, featureScores: dict, ocrDetections=None) -> dict:
     """Baseline and x-height lines, component boxes and gap boxes, all in rectifiedImage pixels.
 
     Each box's issueFeatureIds lists the features it shows a problem with (see issues.py).
@@ -225,7 +228,7 @@ def build_overlay_data(inkMask: np.ndarray, textLines, featureScores: dict) -> d
             lines.append({"lineId": line.lineId, "kind": "xHeight",
                           "x1Px": x1Px, "y1Px": y1Px - xHeightPx, "x2Px": x2Px, "y2Px": y2Px - xHeightPx})
 
-    componentIssues = find_component_issues(textLines, xHeightPx, featureScores)
+    componentIssues = find_component_issues(textLines, xHeightPx, featureScores, ocrDetections)
     components = [{"componentId": component.componentId, "lineId": line.lineId,
                    "xPx": component.xPx, "yPx": component.yPx,
                    "widthPx": component.widthPx, "heightPx": component.heightPx,
@@ -273,10 +276,22 @@ async def analyze(
         return needs_better_photo_response(problem, qualityChecks)
 
     featureMeasurements = compute_feature_measurements(inkMask, textLines, scaleMmPerPxX, scaleMmPerPxY)
+
+    # OCR on the same straightened page the overlays use, so its word boxes line up. It takes a second
+    # or two of CPU, so it runs in a worker thread instead of blocking the server for other requests.
+    ocrResult = await run_in_threadpool(read_handwriting, pageImage)
+    featureMeasurements["ocrConfidencePct"] = ocrResult.confidencePct if ocrResult else None
+    if ocrResult is None:
+        warnings.append("Text recognition isn't available on this server, so OCR readability was left out "
+                        "of the score.")
+
     scoring = score_measurements(featureMeasurements)
-    if scoring["missingFeatureIds"]:
+    # OCR being unavailable already has its own warning above
+    unexplainedMissingIds = [featureId for featureId in scoring["missingFeatureIds"]
+                             if not (featureId == "ocrReadability" and ocrResult is None)]
+    if unexplainedMissingIds:
         warnings.append("Some features could not be measured and were left out of the score: "
-                        + ", ".join(scoring["missingFeatureIds"]) + ".")
+                        + ", ".join(unexplainedMissingIds) + ".")
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -284,9 +299,11 @@ async def analyze(
         "error": None,
         **scoring,    # legibilityScore, scoreLabel, featureScores, featureWeights, missingFeatureIds
         "rectifiedImage": to_jpeg_data_url(pageImage),
+        "recognizedText": ocrResult.recognizedText if ocrResult else None,
         "featureMeasurements": featureMeasurements,
         "warnings": warnings,
         "qualityChecks": qualityChecks,
-        "overlayData": build_overlay_data(inkMask, textLines, scoring["featureScores"]),
+        "overlayData": build_overlay_data(inkMask, textLines, scoring["featureScores"],
+                                          ocrResult.detections if ocrResult else None),
         "advice": generate_advice(scoring["featureScores"], featureMeasurements),
     }

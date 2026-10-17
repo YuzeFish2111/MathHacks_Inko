@@ -18,8 +18,8 @@ MathHacks_Project/
 |   |                                    python-multipart, pydantic, pytest, uvicorn, httpx,
 |   |                                    easyocr, matplotlib, pillow, pillow-heif
 |   |-- app/
-|   |   |-- [~] accuracy_evaluation.py   OCR confidence score with EasyOCR (teammate); runs on its own via
-|   |   |                                python -m app.accuracy_evaluation; NOT yet in /api/analyze
+|   |   |-- [x] accuracy_evaluation.py   OCR readability with EasyOCR (teammate's scoring): shared model,
+|   |   |                                read_handwriting() used by /api/analyze; optional if it can't load
 |   |   |-- [x] __init__.py              marks app/ as a Python package (empty on purpose)
 |   |   |-- [x] main.py                  FastAPI app, POST /api/analyze, GET /api/health;
 |   |   |                                all 9 quality checks / error codes, overlays
@@ -45,6 +45,8 @@ MathHacks_Project/
 |       |-- [x] test_measurements.py     all ten measurements on synthetic images
 |       |-- [x] test_scoring.py          curves, feature scores, renormalized weights, bands
 |       |-- [x] test_schemas.py          fixtures vs schema; TS and Python field names match
+|       |-- [x] conftest.py              keeps the real OCR model out of tests (fakes are used instead)
+|       |-- [x] test_ocr.py              OCR confidence maths, load failure, disabled OCR
 |       |-- [x] test_issues.py           floating/sunk letters, descenders, lean, gaps, clusters, page marks
 |       |-- [x] test_advice.py           templates, direction, weakest-first, max three
 |       `-- [x] test_api.py              complete result, corners, every error code, HTTP 422
@@ -77,7 +79,7 @@ MathHacks_Project/
     `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results
 
 
-BACKEND PROGRESS  (85/85 tests passing; tested on synthetic images, first real photos tried)
+BACKEND PROGRESS  (95/95 tests passing; tested on synthetic images, first real photos tried)
 ================================================================
 Plan step                                   Status
 0. Lock contract                            [x] contract, fixtures, schemas.py, analysis.ts, drift tests
@@ -90,8 +92,10 @@ Plan step                                   Status
 6. API, overlays, validation                [~] /api/analyze complete; overlays mark problem letters and
                                                 gaps (issueFeatureIds); fit_weights.py and validation
                                                 analysis not started
-Extra: OCR accuracy score                   [~] app/accuracy_evaluation.py works standalone (model download
-                                                needs Mac certificates fixed); not in the API or contract
+Extra: OCR readability (contract 1.2)       [x] ninth feature ocrReadability, recognizedText in the response,
+                                                low-confidence words marked on overlays; optional: if the
+                                                model can't load, the other 8 features share its weight.
+                                                Real model not yet run here (Mac certificates)
 
 Contract coverage
   cornerPointsPx        [x] parsed, validated (4 points, inside photo), used to rectify the page;
@@ -114,7 +118,8 @@ Remaining backend work
   [ ] Endpoint that returns detected corners for the preview/crop screen (contract addition)
   [x] issueFeatureIds on overlay components and gaps
   [ ] fit_weights.py once validation ratings exist
-  [ ] Decide whether the OCR score joins /api/analyze (needs featureId + schemaVersion 1.2; easyocr pulls in PyTorch)
+  [x] OCR score joins /api/analyze (featureId ocrReadability, schemaVersion 1.2)
+  [ ] Fix Mac certificates (Install Certificates.command) and run the real OCR model on test photos
   [ ] Optional: letter-level work (x-height consistency, comparison to an ideal example)
 
 Notes
@@ -149,15 +154,16 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
                          (adaptive threshold), removes specks, finds text lines and letter candidates,
                          and labels each blob as letter, mark (dot/punctuation) or cluster (joined letters).
                          Also measures photo contrast and edge sharpness for the blur check.
-  measurements.py        The ten raw measurements: text size, x-height, baseline variation, letter shape
+  measurements.py        Ten of the eleven raw measurements (OCR adds the eleventh): text size,
+                         x-height, baseline variation, letter shape
                          variation (proportions, solidity, slant), stroke width and stroke contrast
                          (distance transform), letter spacing and spacing variation. Uses robust
                          statistics (medians, Theil-Sen, MAD) so a few odd letters don't skew results.
                          Unknown values are null, never 0.
   scoring_config.py      Every tunable number in one place: feature list, which measurement feeds which
                          feature, scoring curves, weights, score bands and all pipeline thresholds.
-  scoring.py             Turns measurements into eight 0-1 feature scores (sweet-spot and decreasing
-                         curves), a 0-100 legibilityScore (weighted average of available features only)
+  scoring.py             Turns measurements into nine 0-1 feature scores (sweet-spot, decreasing and
+                         increasing curves), a 0-100 legibilityScore (weighted average of available features only)
                          and a label ("Very legible" ... "Hard to read").
   advice.py              Up to three practice tips for the weakest features, each naming the measured
                          value, the direction to change and an exercise.
@@ -165,8 +171,9 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
                          uneven or too-tight gaps, joined letters, plus page-wide size/stroke problems.
   schemas.py             The response format (Pydantic). Rejects unknown fields and contradictions
                          (e.g. an error with a score), so the API can't drift from the contract.
-  accuracy_evaluation.py Teammate's OCR experiment: how confidently EasyOCR reads the writing, as a
-                         0-100 score. Runs on its own; not yet part of /api/analyze.
+  accuracy_evaluation.py OCR readability: how confidently EasyOCR reads the straightened page (0-100) and
+                         what it read. Loads the model once and shares it; if it can't load, the API
+                         leaves this feature out instead of failing.
   fit_weights.py         Placeholder for fitting the feature weights to human ratings.
   __init__.py            Marks app/ as a Python package (empty on purpose).
 
@@ -174,7 +181,9 @@ backend/scripts/  (developer tools, run by hand)
   preprocessing.py       Teammate's step-by-step preprocessing walkthrough with plots; opens HEIC photos.
   preview_ink_mask.py    Shows a photo next to its ink mask, for checking thresholds by eye.
 
-backend/tests/  (85 automated tests; run with: cd backend && python3 -m pytest)
+backend/tests/  (95 automated tests; run with: cd backend && python3 -m pytest)
+  conftest.py            Stops tests loading the real OCR model; tests that need OCR use a fake.
+  test_ocr.py            OCR confidence weighting, no-text case, model load failure, OCR switched off.
   test_api.py            Uploads real requests: complete results, page detection, every error code.
   test_image_pipeline.py Lines, letters, deskew, page detection, lighting correction, contrast, sharpness.
   test_measurements.py   Each measurement on drawn shapes with known answers (e.g. 40 px = 4.0 mm).

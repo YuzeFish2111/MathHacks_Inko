@@ -1,10 +1,11 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "status": "complete",
   "error": null,
   "legibilityScore": 78,
   "scoreLabel": "Readable",
   "rectifiedImage": "data:image/jpeg;base64,...",
+  "recognizedText": "The quick brown fox\njumps over the lazy dog.",
   "featureMeasurements": {
     "textSizeMm": 6.2,
     "xHeightMm": 3.1,
@@ -15,7 +16,8 @@
     "strokeContrastRatio": 1.8,
     "strokeWidthMedianMm": 0.42,
     "relativeLetterSpacing": 0.31,
-    "letterSpacingCv": 0.38
+    "letterSpacingCv": 0.38,
+    "ocrConfidencePct": 82.5
   },
   "featureScores": {
     "textSize": 0.86,
@@ -25,40 +27,67 @@
     "strokeContrast": 0.78,
     "strokeWeight": 0.84,
     "letterSpacing": 0.68,
-    "spacingConsistency": 0.61
+    "spacingConsistency": 0.61,
+    "ocrReadability": 0.95
   },
   "featureWeights": {
-    "textSize": 0.125,
-    "xHeight": 0.125,
-    "baselineConsistency": 0.125,
-    "shapeConsistency": 0.125,
-    "strokeContrast": 0.125,
-    "strokeWeight": 0.125,
-    "letterSpacing": 0.125,
-    "spacingConsistency": 0.125
+    "textSize": 0.1111,
+    "xHeight": 0.1111,
+    "baselineConsistency": 0.1111,
+    "shapeConsistency": 0.1111,
+    "strokeContrast": 0.1111,
+    "strokeWeight": 0.1111,
+    "letterSpacing": 0.1111,
+    "spacingConsistency": 0.1111,
+    "ocrReadability": 0.1111
   },
   "missingFeatureIds": [],
   "warnings": [],
   "qualityChecks": [
-    { "checkId": "blur", "passed": true, "message": null }
+    {
+      "checkId": "blur",
+      "passed": true,
+      "message": null
+    }
   ],
   "overlayData": {
     "coordinateSpace": "rectifiedImagePx",
     "imageWidthPx": 1200,
     "imageHeightPx": 1600,
     "lines": [
-      { "lineId": "line-1", "kind": "baseline",
-        "x1Px": 100, "y1Px": 430, "x2Px": 1080, "y2Px": 438 }
+      {
+        "lineId": "line-1",
+        "kind": "baseline",
+        "x1Px": 100,
+        "y1Px": 430,
+        "x2Px": 1080,
+        "y2Px": 438
+      }
     ],
     "components": [
-      { "componentId": "component-1", "lineId": "line-1",
-        "xPx": 120, "yPx": 390, "widthPx": 28, "heightPx": 40,
-        "issueFeatureIds": [] }
+      {
+        "componentId": "component-1",
+        "lineId": "line-1",
+        "xPx": 120,
+        "yPx": 390,
+        "widthPx": 28,
+        "heightPx": 40,
+        "issueFeatureIds": []
+      }
     ],
     "gaps": [
-      { "gapId": "gap-1", "lineId": "line-1", "kind": "letter",
-        "xPx": 148, "yPx": 410, "widthPx": 12, "heightPx": 4,
-        "issueFeatureIds": ["letterSpacing"] }
+      {
+        "gapId": "gap-1",
+        "lineId": "line-1",
+        "kind": "letter",
+        "xPx": 148,
+        "yPx": 410,
+        "widthPx": 12,
+        "heightPx": 4,
+        "issueFeatureIds": [
+          "letterSpacing"
+        ]
+      }
     ]
   },
   "advice": [

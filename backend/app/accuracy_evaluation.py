@@ -1,19 +1,28 @@
-"""Preliminary OCR legibility score: how confidently EasyOCR can read the handwriting.
+"""OCR readability: how confidently a text-recognition model (EasyOCR) can read the handwriting.
 
-Not yet part of POST /api/analyze; adding it needs a contract change (new featureId, schemaVersion 1.2).
+POST /api/analyze calls read_handwriting(); its confidence becomes the ocrConfidencePct measurement
+(feature ocrReadability) and its text becomes recognizedText. If EasyOCR isn't installed or its model
+can't load, read_handwriting() returns None and the feature is simply left out of the score.
 
-Run from the backend/ folder:
+Run on its own from the backend/ folder:
     python -m app.accuracy_evaluation [image path]     (default: data/image0(37).heic at the project root)
 The first run downloads the EasyOCR model, so it needs internet access.
 HEIC photos (iPhone) need:  pip install pillow-heif
 """
+import logging
 import sys
+import threading
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
 
 from .image_pipeline import load_image, to_grayscale, resize_to_width
+from .scoring_config import OCR_ENABLED, OCR_LANGUAGES
+
+logger = logging.getLogger(__name__)
 
 # Found from this file's location, so it works from any folder
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -25,7 +34,50 @@ DEFAULT_IMAGE_PATH = str(PROJECT_ROOT / "data" / "image0(37).heic")
 # Load this once and reuse it when processing multiple images.
 def load_reader():
     import easyocr
-    return easyocr.Reader(["en"], gpu=False)
+    return easyocr.Reader(list(OCR_LANGUAGES), gpu=False)
+
+
+# The server shares one model: loading it takes seconds (and downloads it on first use), so it is
+# loaded on the first request and reused. A failed load is remembered so every request doesn't retry.
+_reader = None
+_readerLoadFailed = False
+_readerLock = threading.Lock()    # one OCR at a time: the model isn't built for parallel calls
+
+
+def get_reader():
+    """The shared EasyOCR reader, or None if OCR is disabled or can't be loaded."""
+    global _reader, _readerLoadFailed
+    if not OCR_ENABLED or _readerLoadFailed:
+        return None
+    if _reader is None:
+        try:
+            _reader = load_reader()
+        except Exception:    # not installed, no internet for the model download, certificate problems...
+            logger.exception("EasyOCR could not be loaded; ocrReadability will be left out of scores")
+            _readerLoadFailed = True
+            return None
+    return _reader
+
+
+@dataclass
+class OcrResult:
+    confidencePct: Optional[float]    # character-weighted confidence, 0-100; None if no text was found
+    recognizedText: str               # what the model read, one detected region per line
+    detections: list                  # raw (boundingBox, text, confidence 0-1) tuples, in image pixels
+
+
+def read_handwriting(grayscaleImage: np.ndarray) -> Optional[OcrResult]:
+    """Run OCR on the straightened page. None if OCR is unavailable (the API then skips the feature).
+
+    Pass the same image the overlays refer to (rectifiedImage), so detection boxes line up with it.
+    """
+    with _readerLock:
+        reader = get_reader()
+        if reader is None:
+            return None
+        recognizedText, meanConfidence, _, detections = measure_handwriting_legibility(grayscaleImage, reader)
+    confidencePct = None if meanConfidence is None else 100.0 * meanConfidence
+    return OcrResult(confidencePct=confidencePct, recognizedText=recognizedText, detections=list(detections))
 
 
 def measure_handwriting_legibility(gray_image, reader):

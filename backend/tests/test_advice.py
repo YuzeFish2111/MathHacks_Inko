@@ -4,12 +4,12 @@ import string
 from app.advice import ADVICE_TEMPLATES, DISPLAY_FORMATS, build_advice_item, generate_advice
 from app.schemas import AdviceItem
 from app.scoring import compute_feature_scores
-from app.scoring_config import SWEET_SPOT_CURVES, DECREASING_CURVES, FEATURE_SOURCES, MAX_ADVICE_ITEMS
+from app.scoring_config import SWEET_SPOT_CURVES, DECREASING_CURVES, INCREASING_CURVES, FEATURE_SOURCES, MAX_ADVICE_ITEMS
 
 PERFECT_MEASUREMENTS = {
     "textSizeMm": 5.0, "xHeightMm": 3.0, "baselineVariationMm": 0.2, "aspectRatioCv": 0.05,
     "solidityCv": 0.02, "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthMedianMm": 0.5,
-    "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1,
+    "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1, "ocrConfidencePct": 95.0,
 }
 
 
@@ -21,8 +21,9 @@ def advice_for(**changes):
 def test_every_measurement_and_direction_has_a_template():
     expected = {(name, direction) for name in SWEET_SPOT_CURVES for direction in ("low", "high")}
     expected |= {(name, "high") for name in DECREASING_CURVES}
+    expected |= {(name, "low") for name in INCREASING_CURVES}
     assert set(ADVICE_TEMPLATES) == expected
-    assert set(DISPLAY_FORMATS) == set(SWEET_SPOT_CURVES) | set(DECREASING_CURVES)
+    assert set(DISPLAY_FORMATS) == set(SWEET_SPOT_CURVES) | set(DECREASING_CURVES) | set(INCREASING_CURVES)
 
 
 def test_templates_only_use_known_placeholders():
@@ -78,3 +79,9 @@ def test_every_template_produces_a_valid_advice_item():
         tip = build_advice_item(featureId, dict(PERFECT_MEASUREMENTS, **{name: worst[direction]}))
         AdviceItem.model_validate(tip)
         assert not re.search(r"[{}]", tip["message"]), name    # every placeholder was filled
+
+
+def test_low_ocr_confidence_gets_a_recognition_tip():
+    tip = advice_for(ocrConfidencePct=40.0)[0]
+    assert tip["featureId"] == "ocrReadability"
+    assert tip["message"] == "A text-recognition program read your writing with only 40% confidence."

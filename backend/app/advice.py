@@ -2,13 +2,14 @@
 
 Each tip comes from a template keyed by (measurement, direction):
 - sweet-spot measurements can be "low" (below the ideal range) or "high" (above it);
-- decreasing measurements (variation) can only be "high" (too uneven).
+- decreasing measurements (variation) can only be "high" (too uneven);
+- increasing measurements (OCR confidence) can only be "low" (too hard to read).
 shapeConsistency has three sources, so its tip describes whichever source scored worst.
 """
 from typing import Optional
 
 from .scoring import score_measurement
-from .scoring_config import (FEATURE_IDS, FEATURE_SOURCES, SWEET_SPOT_CURVES,
+from .scoring_config import (FEATURE_IDS, FEATURE_SOURCES, SWEET_SPOT_CURVES, INCREASING_CURVES,
                              MAX_ADVICE_ITEMS, ADVICE_MAX_FEATURE_SCORE)
 
 # Placeholders: {value} is the measured value, {idealLow}/{idealHigh} the ideal range (sweet-spot curves only).
@@ -87,6 +88,12 @@ ADVICE_TEMPLATES = {
         "message": "Your letter gaps vary by {value}%.",
         "exercise": "Practise keeping a similar pencil-width gap between letters.",
     },
+    ("ocrConfidencePct", "low"): {
+        "title": "Make each letter easy to recognise",
+        "message": "A text-recognition program read your writing with only {value}% confidence.",
+        "exercise": "Form every letter completely: close the loops of a, d, g and o, cross t and f, "
+                    "and dot i and j.",
+    },
 }
 
 # How each measurement's value is shown in a message: (multiplier, decimal places)
@@ -94,7 +101,7 @@ DISPLAY_FORMATS = {
     "textSizeMm": (1, 1), "xHeightMm": (1, 1), "baselineVariationMm": (1, 1),
     "aspectRatioCv": (100, 0), "solidityCv": (100, 0), "slantStdDeg": (1, 0),
     "strokeContrastRatio": (1, 1), "strokeWidthMedianMm": (1, 2),
-    "relativeLetterSpacing": (100, 0), "letterSpacingCv": (100, 0),
+    "relativeLetterSpacing": (100, 0), "letterSpacingCv": (100, 0), "ocrConfidencePct": (1, 0),
 }
 
 
@@ -112,7 +119,9 @@ def _weakest_source(featureId: str, featureMeasurements: dict[str, Optional[floa
 
 
 def _direction(measurementName: str, value: float) -> str:
-    """'low' if below a sweet-spot range, otherwise 'high' (too big, or too much variation)."""
+    """'low' if below a sweet-spot range or an increasing measurement, otherwise 'high' (too big, or too uneven)."""
+    if measurementName in INCREASING_CURVES:
+        return "low"
     if measurementName in SWEET_SPOT_CURVES:
         _, idealLow, _, _ = SWEET_SPOT_CURVES[measurementName]
         return "low" if value < idealLow else "high"

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "status": "needs_better_photo",
   "error": {
     "code": "BLUR_TOO_HIGH",
@@ -8,14 +8,18 @@
   "legibilityScore": null,
   "scoreLabel": null,
   "rectifiedImage": null,
+  "recognizedText": null,
   "featureMeasurements": null,
   "featureScores": null,
   "featureWeights": null,
   "missingFeatureIds": [],
   "warnings": [],
   "qualityChecks": [
-    { "checkId": "blur", "passed": false,
-      "message": "The photo looks blurry." }
+    {
+      "checkId": "blur",
+      "passed": false,
+      "message": "The photo looks blurry."
+    }
   ],
   "overlayData": null,
   "advice": []

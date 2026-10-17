@@ -2,7 +2,7 @@
 // Must match backend/app/schemas.py field-for-field; see shared/analysis-contract.md.
 // null means "could not be estimated"; 0 is a real measurement.
 
-export const SCHEMA_VERSION = "1.1";
+export const SCHEMA_VERSION = "1.2"; // 1.2 added OCR: ocrReadability, ocrConfidencePct, recognizedText
 
 export type FeatureId =
   | "textSize"
@@ -12,7 +12,8 @@ export type FeatureId =
   | "strokeContrast"
   | "strokeWeight"
   | "letterSpacing"
-  | "spacingConsistency";
+  | "spacingConsistency"
+  | "ocrReadability";
 
 export type CheckId =
   | "fileType"
@@ -65,7 +66,7 @@ export interface QualityCheck {
   message: string | null;
 }
 
-/** The ten raw measurements. */
+/** The eleven raw measurements. */
 export interface FeatureMeasurements {
   textSizeMm: number | null;
   xHeightMm: number | null;
@@ -77,9 +78,11 @@ export interface FeatureMeasurements {
   strokeWidthMedianMm: number | null;
   relativeLetterSpacing: number | null;
   letterSpacingCv: number | null;
+  /** How confidently the OCR model read the writing, 0-100; null if OCR is unavailable or read nothing. */
+  ocrConfidencePct: number | null;
 }
 
-/** featureId -> 0-1 normalizedScore, or null when missing. All eight keys are always sent. */
+/** featureId -> 0-1 normalizedScore, or null when missing. Every key is always sent. */
 export type FeatureScores = Record<FeatureId, number | null>;
 
 /** Weights actually used, renormalized over available features; missing features are left out. */
@@ -135,7 +138,7 @@ export interface AdviceItem {
 // ---------- full response ----------
 
 export interface AnalysisResponse {
-  schemaVersion: "1.1";
+  schemaVersion: "1.2";
   status: AnalysisStatus;
   error: AnalysisError | null;
   /** Final 0-100 score, or null. */
@@ -143,6 +146,8 @@ export interface AnalysisResponse {
   scoreLabel: string | null;
   /** Data URL (PNG or JPEG) of the rectified page that overlayData refers to. */
   rectifiedImage: string | null;
+  /** What the OCR model read; null if OCR is unavailable or didn't run. */
+  recognizedText: string | null;
   featureMeasurements: FeatureMeasurements | null;
   featureScores: FeatureScores | null;
   featureWeights: FeatureWeights | null;
