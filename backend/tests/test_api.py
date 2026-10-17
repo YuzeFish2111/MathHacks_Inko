@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas import AnalysisResponse
+from app.scoring_config import MAX_UPLOAD_BYTES
 
 client = TestClient(app)
 A4 = {"pageWidthMm": "210", "pageHeightMm": "297"}
@@ -108,6 +109,16 @@ def test_faint_writing_is_low_contrast():
 
 def test_light_pencil_still_passes():
     assert post(png_bytes(make_page_photo(inkLevel=150, paperLevel=230))).json()["status"] == "complete"
+
+
+def test_file_too_large():
+    assert error_code(post(b"0" * (MAX_UPLOAD_BYTES + 1))) == "FILE_TOO_LARGE"
+
+
+def test_too_few_letters_is_segmentation_uncertain():
+    page = np.full((1414, 1000, 3), 255, np.uint8)
+    cv2.putText(page, "abc", (300, 600), cv2.FONT_HERSHEY_SIMPLEX, 5, (0, 0, 0), 12)   # plenty of ink, 3 letters
+    assert error_code(post(png_bytes(page))) == "SEGMENTATION_UNCERTAIN"
 
 
 def test_corners_outside_the_photo():
