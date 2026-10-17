@@ -106,6 +106,17 @@ field-for-field. Example responses: `shared/fixtures/`.
 - `advice` item: `featureId`, `title`, `message`, `exercise`.
 - `rectifiedImage`: data URL (PNG or JPEG) of the rectified page that overlays refer to.
 - All overlay coordinates and dimensions are pixels in `"rectifiedImagePx"`.
+- `issueFeatureIds` on a component or gap lists the features that box shows a problem with
+  (empty list = no problem). Two kinds of mark:
+  - **Element marks**, judged against the writer's own typical letter or gap:
+    `baselineConsistency` (letter floats above or has sunk below its line; descenders are not marked),
+    `shapeConsistency` (letter leans much more or less than the typical letter),
+    `spacingConsistency` (letter gap much wider or narrower than the typical gap),
+    `letterSpacing` (letter gap outside the ideal range, or letters joined into a cluster).
+  - **Whole-page marks**: `textSize`, `xHeight`, `strokeWeight`, `strokeContrast` are added to every
+    letter when that feature scores at or below the threshold. Draw these as a page-level state
+    (e.g. tint all letters when that feature is selected), not as individual problem boxes.
+  - Word gaps are never marked. Thresholds live in `backend/app/scoring_config.py` (`ISSUE_*`).
 
 Full examples (illustrative values only, not calibrated):
 

@@ -33,6 +33,7 @@ MathHacks_Project/
 |   |   |-- [x] measurements.py          the ten featureMeasurements; fit_baseline, find_gaps (overlays)
 |   |   |-- [x] scoring.py               curves, featureScores, legibilityScore, featureWeights,
 |   |   |                                missingFeatureIds, scoreLabel
+|   |   |-- [x] issues.py                issueFeatureIds: marks problem letters and gaps on the overlays
 |   |   |-- [x] advice.py                weakest-first rule-based tips (templates per measurement + direction)
 |   |   `-- [ ] fit_weights.py           regression of weights against human ratings
 |   |-- scripts/
@@ -44,6 +45,7 @@ MathHacks_Project/
 |       |-- [x] test_measurements.py     all ten measurements on synthetic images
 |       |-- [x] test_scoring.py          curves, feature scores, renormalized weights, bands
 |       |-- [x] test_schemas.py          fixtures vs schema; TS and Python field names match
+|       |-- [x] test_issues.py           floating/sunk letters, descenders, lean, gaps, clusters, page marks
 |       |-- [x] test_advice.py           templates, direction, weakest-first, max three
 |       `-- [x] test_api.py              complete result, corners, every error code, HTTP 422
 |
@@ -70,7 +72,7 @@ MathHacks_Project/
     `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results
 
 
-BACKEND PROGRESS  (74/74 tests passing; tested on synthetic images, first real photos tried)
+BACKEND PROGRESS  (85/85 tests passing; tested on synthetic images, first real photos tried)
 ================================================================
 Plan step                                   Status
 0. Lock contract                            [x] contract, fixtures, schemas.py, analysis.ts, drift tests
@@ -80,8 +82,9 @@ Plan step                                   Status
                                                 marks/clusters, segmentation check
 4. Measurements                             [x] all ten, unit-tested
 5. Scoring and advice                       [x] feature scores, renormalized weights, bands, tips
-6. API, overlays, validation                [~] /api/analyze complete; overlays without issueFeatureIds;
-                                                fit_weights.py and validation analysis not started
+6. API, overlays, validation                [~] /api/analyze complete; overlays mark problem letters and
+                                                gaps (issueFeatureIds); fit_weights.py and validation
+                                                analysis not started
 Extra: OCR accuracy score                   [~] app/accuracy_evaluation.py works standalone (model download
                                                 needs Mac certificates fixed); not in the API or contract
 
@@ -104,7 +107,7 @@ Remaining backend work
   [x] Uneven-lighting normalization (backgroundEstimate -> normalizedImage)
   [x] Automatic page detection when no cornerPointsPx are sent
   [ ] Endpoint that returns detected corners for the preview/crop screen (contract addition)
-  [ ] issueFeatureIds on overlay components and gaps
+  [x] issueFeatureIds on overlay components and gaps
   [ ] fit_weights.py once validation ratings exist
   [ ] Decide whether the OCR score joins /api/analyze (needs featureId + schemaVersion 1.2; easyocr pulls in PyTorch)
   [ ] Optional: letter-level work (x-height consistency, comparison to an ideal example)

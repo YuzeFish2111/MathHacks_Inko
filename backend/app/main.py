@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from .advice import generate_advice
+from .issues import find_component_issues, find_gap_issues
 from .image_pipeline import (decode_image, detect_page_corners, rectify_page, to_grayscale, resize_to_width,
                              normalize_illumination, deskew,
                              threshold_ink, remove_small_components, find_text_lines, find_components,
@@ -202,8 +203,11 @@ def segment_writing(grayscaleImage: np.ndarray, qualityChecks: list[dict]):
 
 # ---------- 7. Overlays: what the browser draws on top of rectifiedImage ----------
 
-def build_overlay_data(inkMask: np.ndarray, textLines) -> dict:
-    """Baseline and x-height lines, component boxes and gap boxes, all in rectifiedImage pixels."""
+def build_overlay_data(inkMask: np.ndarray, textLines, featureScores: dict) -> dict:
+    """Baseline and x-height lines, component boxes and gap boxes, all in rectifiedImage pixels.
+
+    Each box's issueFeatureIds lists the features it shows a problem with (see issues.py).
+    """
     imageHeightPx, imageWidthPx = inkMask.shape
     xHeightPx = measure_x_height_px(inkMask, textLines)
 
@@ -221,13 +225,16 @@ def build_overlay_data(inkMask: np.ndarray, textLines) -> dict:
             lines.append({"lineId": line.lineId, "kind": "xHeight",
                           "x1Px": x1Px, "y1Px": y1Px - xHeightPx, "x2Px": x2Px, "y2Px": y2Px - xHeightPx})
 
+    componentIssues = find_component_issues(textLines, xHeightPx, featureScores)
     components = [{"componentId": component.componentId, "lineId": line.lineId,
                    "xPx": component.xPx, "yPx": component.yPx,
-                   "widthPx": component.widthPx, "heightPx": component.heightPx, "issueFeatureIds": []}
+                   "widthPx": component.widthPx, "heightPx": component.heightPx,
+                   "issueFeatureIds": componentIssues[component.componentId]}
                   for line in textLines for component in line.components]
 
-    gaps = [dict(gap, gapId=f"gap-{gapNumber}", issueFeatureIds=[])
-            for gapNumber, gap in enumerate(find_gaps(textLines), start=1)]
+    gapList = find_gaps(textLines)
+    gaps = [dict(gap, gapId=f"gap-{gapNumber}", issueFeatureIds=gapIssueIds)
+            for gapNumber, (gap, gapIssueIds) in enumerate(zip(gapList, find_gap_issues(gapList, xHeightPx)), start=1)]
 
     return {"coordinateSpace": "rectifiedImagePx", "imageWidthPx": imageWidthPx, "imageHeightPx": imageHeightPx,
             "lines": lines, "components": components, "gaps": gaps}
@@ -275,6 +282,6 @@ async def analyze(
         "featureMeasurements": featureMeasurements,
         "warnings": warnings,
         "qualityChecks": qualityChecks,
-        "overlayData": build_overlay_data(inkMask, textLines),
+        "overlayData": build_overlay_data(inkMask, textLines, scoring["featureScores"]),
         "advice": generate_advice(scoring["featureScores"], featureMeasurements),
     }

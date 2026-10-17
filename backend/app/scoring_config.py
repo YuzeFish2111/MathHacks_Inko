@@ -36,6 +36,16 @@ SCORE_BANDS = ((85, "Very legible"), (70, "Readable"), (50, "Some difficulty"), 
 MAX_ADVICE_ITEMS = 3            # at most this many tips, weakest feature first
 ADVICE_MAX_FEATURE_SCORE = 0.9  # features scoring above this are good enough: no tip
 
+# Overlay problem marks: issueFeatureIds (backend/app/issues.py); all ratios are x-height multiples
+ISSUE_MAX_FEATURE_SCORE = 0.9      # a whole-page feature (size, x-height, stroke) at or below this marks every letter
+ISSUE_BASELINE_OFFSET_RATIO = 0.25 # letter floating above its baseline by more than this, or sunk below it
+                                   # (bottom AND top both this far low, so descenders g/p/y aren't marked)
+                                   # -> baselineConsistency
+ISSUE_SLANT_DEVIATION_DEG = 25.0   # letter leaning this much more/less than the median letter -> shapeConsistency
+                                   # (upright but lopsided letters like h, r, b, d read up to ~17 degrees)
+ISSUE_GAP_DEVIATION_RATIO = 0.25   # letter gap differing from the median gap by this -> spacingConsistency
+# A gap outside the relativeLetterSpacing ideal range (sweet-spot b..c) is marked letterSpacing
+
 # Upload and photo checks (backend/app/main.py)
 ALLOWED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024   # 15 MB; phone photos are usually 2-6 MB

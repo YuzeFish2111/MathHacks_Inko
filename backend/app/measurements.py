@@ -124,17 +124,20 @@ def measure_solidity_cv(textLines: list[TextLine]) -> Optional[float]:
     return _cv(solidities)
 
 
-def measure_slant_std_deg(textLines: list[TextLine]) -> Optional[float]:
-    """Standard deviation of letter slant, in degrees.
+def letter_slant_deg(component: LetterComponent) -> Optional[float]:
+    """One letter's slant in degrees (0 = upright), or None for a shape with no height.
 
-    Each letter's slant comes from its second-order moments: mu11 / mu02 is how much x shifts
-    per unit of y (0 = upright).
+    From second-order moments: mu11 / mu02 is how much x shifts per unit of y.
     """
-    slantsDeg = []
-    for component in _letters(textLines):
-        moments = cv2.moments(component.contour)
-        if moments["mu02"] > 0:
-            slantsDeg.append(math.degrees(math.atan(moments["mu11"] / moments["mu02"])))
+    moments = cv2.moments(component.contour)
+    if moments["mu02"] <= 0:
+        return None
+    return math.degrees(math.atan(moments["mu11"] / moments["mu02"]))
+
+
+def measure_slant_std_deg(textLines: list[TextLine]) -> Optional[float]:
+    """Standard deviation of letter slant, in degrees."""
+    slantsDeg = [slantDeg for slantDeg in map(letter_slant_deg, _letters(textLines)) if slantDeg is not None]
     return float(np.std(slantsDeg)) if len(slantsDeg) >= MIN_COMPONENTS_FOR_STATS else None
 
 
