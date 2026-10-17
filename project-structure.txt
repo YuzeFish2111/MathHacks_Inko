@@ -11,6 +11,7 @@ MathHacks_Project/
 |                                        validation/samples/)
 |-- [x] project-structure.txt            this file
 |-- [x] instructions.txt                 how users should take their handwriting photos
+|-- [x] URGENT-TODO.md                   blockers before the next step, with owners
 |-- data/                                real test photos from the team (PUBLIC on GitHub; see note below)
 |
 |-- backend/                             Python + FastAPI + OpenCV
@@ -52,6 +53,7 @@ MathHacks_Project/
 |       `-- [x] test_api.py              complete result, corners, every error code, HTTP 422
 |
 |-- frontend/                            React + TypeScript (app not set up yet; no package.json)
+|   |-- [x] README.md                    step-by-step guide for frontend teammates
 |   `-- src/
 |       |-- components/
 |       |   `-- [x] RotateButton.tsx     "Rotate 90°" button for the preview/crop screen
@@ -134,6 +136,8 @@ What each file does, in the order data flows through the app. Start with main.py
 Root
   MathHacks-vibe-coding-plan.md  The full project plan: goals, user flow, build steps, naming contract,
                                  validation method. The source of truth for names and scope.
+  URGENT-TODO.md                 Blockers to clear before the next step (real photos, OCR certificates,
+                                 frontend setup, corner-preview decision, privacy, validation).
   instructions.txt               Step-by-step guide for people taking handwriting photos (paper, pen,
                                  lighting, framing) and what each "retake" message means.
   project-structure.txt          This file: folder map, backend progress tracker, file summaries.
@@ -194,6 +198,8 @@ backend/tests/  (95 automated tests; run with: cd backend && python3 -m pytest)
 
 backend/requirements.txt  Python packages to install: pip install -r backend/requirements.txt
 
+frontend/README.md  Step-by-step guide for frontend teammates: setup, API call, every screen,
+                    overlays, phone testing, definition of done.
 frontend/src/  (React app not set up yet; these files are ready to plug in)
   types/analysis.ts          The same response format as schemas.py, for the React app.
   utils/rotateImage.ts       Turns the photo 90 degrees in the browser (canvas) before upload, and moves
