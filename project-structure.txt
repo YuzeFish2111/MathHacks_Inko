@@ -14,6 +14,7 @@ MathHacks_Project/
 |-- [x] URGENT-TODO.md                   blockers before the next step, with owners
 |
 |-- backend/                             Python + FastAPI + OpenCV
+|   |-- [x] README.md                    full backend documentation (API, modules, config, tests)
 |   |-- [x] requirements.txt             numpy, opencv-python-headless, scipy, fastapi,
 |   |                                    python-multipart, pydantic, pytest, uvicorn, httpx,
 |   |                                    easyocr, matplotlib, pillow, pillow-heif
@@ -192,6 +193,8 @@ backend/tests/  (92 automated tests; run with: cd backend && python3 -m pytest)
   test_issues.py         Overlay marks: floating/sunk letters, descenders left alone, leaning letters, gaps.
   test_schemas.py        Example responses match the schema; TypeScript and Python field names match.
 
+backend/README.md         Full backend documentation: API, request flow, every module, settings,
+                          scoring model, tests, common tasks, troubleshooting, limitations.
 backend/requirements.txt  Python packages to install: pip install -r backend/requirements.txt
 
 frontend/README.md  Step-by-step guide for frontend teammates: setup, API call, every screen,
