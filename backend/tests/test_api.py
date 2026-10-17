@@ -42,7 +42,7 @@ def error_code(response):
 def test_health():
         assert client.get("/api/health").json() == {
         "status": "ok",
-        "schemaVersion": "2.0",
+        "schemaVersion": "2.1",
     }
 
 
@@ -238,3 +238,10 @@ def test_api_still_works_when_ocr_is_unavailable():
     assert body["recognizedText"] is None
     assert "ocrReadability" not in body["featureScores"] and "ocrConfidencePct" not in body["featureMeasurements"]
     assert sum(1 for warning in body["warnings"] if "Text recognition" in warning) == 1
+
+
+def test_canvas_ratio_is_null_without_page_edges():
+    body = post(png_bytes(make_page_photo())).json()          # page fills the photo: no edges found
+    assert body["featureMeasurements"]["textHeightCanvasRatio"] is None
+    assert "textSize" in body["missingFeatureIds"]
+    assert any("whole photo" in warning for warning in body["warnings"])

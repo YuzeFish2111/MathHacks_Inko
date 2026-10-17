@@ -23,17 +23,17 @@ ADVICE_TEMPLATES = {
         "message": "Your letters are about {value}% of the canvas height; the target range is {idealLow}-{idealHigh}%.",
         "exercise": "Copy the sentence again, keeping each letter inside the space between two lines.",
     },
-    ("xHeightTextRatio", "low"): {
+    ("xHeightAscenderRatio", "low"): {
         "title": "Make small letters taller",
-        "message": "The bodies of your lowercase letters (a, e, o) are about {value}% of typical letter height; "
+        "message": "Your small letters (a, e, o) are {value}% of the height of your tall letters (b, d, h); "
                    "the target range is {idealLow}-{idealHigh}%.",
         "exercise": "Practise rows of a, e, o and n, making them reach halfway up the line.",
     },
-    ("xHeightTextRatio", "high"): {
-        "title": "Make small letters shorter",
-        "message": "The bodies of your lowercase letters (a, e, o) are about {value}% of typical letter height; "
-                   "the target range is {idealLow}-{idealHigh}%.",
-        "exercise": "Practise rows of a, e, o and n, keeping them to half the line height so tall letters stand out.",
+    ("xHeightAscenderRatio", "high"): {
+        "title": "Make tall letters stand out",
+        "message": "Your small letters (a, e, o) are {value}% of the height of your tall letters (b, d, h), "
+                   "so the two are hard to tell apart; the target range is {idealLow}-{idealHigh}%.",
+        "exercise": "Practise b, d, h, k and l, letting them rise clearly above the small letters.",
     },
     ("baselineVariationRatio", "high"): {
         "title": "Keep letters on the line",
@@ -77,14 +77,19 @@ ADVICE_TEMPLATES = {
         "message": "Your letter gaps vary by {value}%.",
         "exercise": "Practise keeping a similar pencil-width gap between letters.",
     },
+    ("letterHeightCv", "high"): {
+        "title": "Keep same-height letters the same height",
+        "message": "Letters that should match in height (a with e and o, b with d and h) differ by about {value}%.",
+        "exercise": "Write between two guide lines (or on lined paper) so every small letter touches both.",
+    },
 }
 
 # How each measurement's value is shown in a message: (multiplier, decimal places)
 DISPLAY_FORMATS = {
-    "textHeightCanvasRatio": (100, 1), "xHeightTextRatio": (100, 1), "baselineVariationRatio": (100, 1),
+    "textHeightCanvasRatio": (100, 1), "xHeightAscenderRatio": (100, 0), "baselineVariationRatio": (100, 1),
     "slantStdDeg": (1, 0),
     "strokeContrastRatio": (1, 1), "strokeWidthRatio": (100, 1),
-    "relativeLetterSpacing": (100, 0), "letterSpacingCv": (100, 0),
+    "relativeLetterSpacing": (100, 0), "letterSpacingCv": (100, 0), "letterHeightCv": (100, 0),
 }
 
 

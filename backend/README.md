@@ -7,7 +7,7 @@ to three practice tips. Built with FastAPI, OpenCV, NumPy and SciPy.
 The score isn't validated against human ratings yet (see [Validation](#10-validation-not-yet-run)), so
 present it as an estimate.
 
-Contract version: **2.0**. Tests use synthetic images.
+Contract version: **2.1**. Tests: **105**, all passing (on synthetic images).
 
 **Contents**
 1. [Quick start](#1-quick-start)
@@ -34,7 +34,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-- http://127.0.0.1:8000/api/health should return `{"status":"ok","schemaVersion":"2.0"}`
+- http://127.0.0.1:8000/api/health should return `{"status":"ok","schemaVersion":"2.1"}`
 - http://127.0.0.1:8000/docs gives interactive docs: upload a photo and see the real response.
 
 Run the tests (from `backend/`):
@@ -68,7 +68,7 @@ backend/
 ├── app/                      the API (one request flows main -> pipeline -> measurements -> scoring)
 │   ├── main.py               FastAPI app, endpoints, quality checks, overlay building
 │   ├── image_pipeline.py     page detection, flattening, lighting, deskew, ink mask, lines, letters
-│   ├── measurements.py       the 8 raw measurements
+│   ├── measurements.py       the 9 raw measurements, height groups
 │   ├── scoring.py            curves -> feature scores -> legibilityScore -> label
 │   ├── scoring_config.py     every tunable number (thresholds, curves, weights, bands)
 │   ├── advice.py             up to 3 tips, weakest feature first
@@ -79,7 +79,7 @@ backend/
 │   └── __init__.py           marks app/ as a package (empty on purpose)
 ├── scripts/
 │   └── preview_ink_mask.py   shows a photo next to its ink mask (needs matplotlib)
-└── tests/                    92 tests; conftest.py keeps the real OCR model out of tests
+└── tests/                    105 tests; conftest.py keeps the real OCR model out of tests
 ```
 
 The shared contract lives outside this folder: `shared/analysis-contract.md` (names, units, error codes)
@@ -90,7 +90,7 @@ and `shared/fixtures/*.json` (example responses). `frontend/src/types/analysis.t
 ## 3. The API
 
 ### `GET /api/health`
-Returns `{"status": "ok", "schemaVersion": "2.0"}`.
+Returns `{"status": "ok", "schemaVersion": "2.1"}`.
 
 ### `POST /api/analyze` (multipart/form-data)
 
@@ -119,14 +119,14 @@ curl -F imageFile=@photo.jpg -F pageWidthMm=210 -F pageHeightMm=297 http://127.0
 
 | Field | Type | Meaning |
 |---|---|---|
-| `schemaVersion` | `"2.0"` | contract version |
+| `schemaVersion` | `"2.1"` | contract version |
 | `status` | `"complete"` / `"needs_better_photo"` | |
 | `error` | `{code, message}` or null | set only for `needs_better_photo` |
 | `legibilityScore` | integer 0-100 or null | the final estimate |
 | `scoreLabel` | string or null | "Very legible", "Readable", "Some difficulty", "Hard to read" |
 | `rectifiedImage` | JPEG data URL or null | the straightened, lighting-corrected page all overlays refer to |
 | `recognizedText` | string or null | what the OCR model read; **display only, never scored** |
-| `featureMeasurements` | object or null | the 8 raw measurements (each may be null) |
+| `featureMeasurements` | object or null | the 9 raw measurements (each may be null) |
 | `featureScores` | object or null | the 8 feature scores, 0-1 (each may be null) |
 | `featureWeights` | object or null | weights actually used (only for available features; they sum to 1) |
 | `missingFeatureIds` | list | features that couldn't be measured |
@@ -184,7 +184,7 @@ segment_writing
   find_text_lines                                                                     [check 6]
   measure_ink_contrast, measure_edge_sharpness                                        [checks 7, 8]
   find_components             letters / marks / clusters                              [check 9]
-compute_feature_measurements  the 8 raw measurements
+compute_feature_measurements  the 9 raw measurements
 score_measurements            feature scores, weights, legibilityScore, label
 read_handwriting              OCR in a worker thread -> recognizedText (display only)
 build_overlay_data            lines, boxes, issueFeatureIds
@@ -245,14 +245,22 @@ Only `kind == "letter"` components are used for size and shape.
 
 | Measurement | Unit | Method |
 |---|---|---|
-| `textHeightCanvasRatio` | ratio | median letter height / canvas height before deskew |
-| `xHeightTextRatio` | ratio | estimated lowercase body height / median letter height |
-| `baselineVariationRatio` | ratio | robust spread around fitted baseline / lowercase body height |
+| `textHeightCanvasRatio` | ratio | median letter height / canvas height before deskew; null when the page edges weren't found |
+| `xHeightAscenderRatio` | ratio | median x-height-letter height / median ascender height (height groups, below) |
+| `baselineVariationRatio` | ratio | robust spread (1.4826 x MAD) of non-descender letters around the fitted baseline / lowercase body height |
 | `slantStdDeg` | degrees | `letter_slant_deg` = atan(mu11 / mu02) from image moments; standard deviation over letters |
+| `letterHeightCv` | ratio | each letter's height / its height group's median, pooled over x-height letters and ascenders; standard deviation |
 | `strokeContrastRatio` | ratio | 90th / 10th percentile of stroke widths |
 | `strokeWidthRatio` | ratio | median stroke width / lowercase body height |
 | `relativeLetterSpacing` | x x-height | median letter gap / x-height |
 | `letterSpacingCv` | ratio | coefficient of variation (std / mean) of letter gaps |
+
+**Height groups (`classify_height_groups`).** Letters are only compared with letters of the same height.
+Per line, each letter's height above the fitted baseline is divided by the line's typical body height
+(the median, which tracks the x-height): at most 1.12 is an x-height letter, at least 1.20 an ascender,
+in between is excluded; a tail more than 0.25 below the baseline with the top still at least 0.75 high
+is a descender (a letter whose top AND bottom are low has sunk, so it isn't excused as a descender).
+`xHeightAscenderRatio`, `letterHeightCv` and `baselineVariationRatio` use these groups.
 
 `find_gaps()` lists every gap between neighbouring non-mark components and labels it `"word"` if wider
 than 2.5x the line's median gap, else `"letter"`. It feeds both the spacing measurements and the overlays.
@@ -344,7 +352,7 @@ Every tunable number lives here; nothing is hard-coded elsewhere. Pixel values a
 | Issue marks | `ISSUE_MAX_FEATURE_SCORE` = 0.9, `ISSUE_BASELINE_OFFSET_RATIO` = 0.25, `ISSUE_SLANT_DEVIATION_DEG` = 25, `ISSUE_GAP_DEVIATION_RATIO` = 0.25 |
 | OCR | `OCR_ENABLED` = True, `OCR_LANGUAGES` = ("en",) |
 | Upload / photo checks | `ALLOWED_IMAGE_TYPES`, `MAX_UPLOAD_BYTES` = 15 MB, `MIN_IMAGE_SIDE_PX` = 600, `MIN_INK_FRACTION` = 0.0005, `MIN_INK_CONTRAST` = 30, `MIN_EDGE_SHARPNESS` = 0.2, `MIN_LETTERS_FOR_ANALYSIS` = 10, `RECTIFIED_JPEG_QUALITY` = 85 |
-| Page detection | `PAGE_DETECT_MAX_SIDE_PX` = 800, `PAGE_MIN_AREA_FRACTION` = 0.2, `PAGE_MAX_AREA_FRACTION` = 0.97, `PAGE_ASPECT_TOLERANCE` = 0.35, `PAGE_MIN_BRIGHTNESS_GAIN` = 15 |
+| Page detection | `PAGE_DETECT_MAX_SIDE_PX` = 800, `PAGE_MIN_AREA_FRACTION` = 0.2, `PAGE_MAX_AREA_FRACTION` = 0.97, `PAGE_MIN_BRIGHTNESS_GAIN` = 15 |
 | Image pipeline | `TARGET_IMAGE_WIDTH_PX` = 1000, `BACKGROUND_KERNEL_PX` = 31, `BACKGROUND_SMOOTHING_PX` = 5, `BLUR_KERNEL_PX` = 3, `THRESHOLD_BLOCK_SIZE_PX` = 31, `THRESHOLD_OFFSET_C` = 10, `MIN_COMPONENT_AREA_PX` = 10 |
 | Segmentation | `LINE_MIN_INK_FRACTION` = 0.05, `LINE_MERGE_GAP_PX` = 6, `LINE_MIN_HEIGHT_PX` = 8, `NEAR_LINE_MAX_GAP_RATIO` = 0.5, `MARK_MAX_HEIGHT_RATIO` = 0.4, `CLUSTER_MIN_WIDTH_RATIO` = 2.0 |
 | Deskew | `DESKEW_MAX_ANGLE_DEG` = 15, `DESKEW_STEP_DEG` = 0.5 |
@@ -361,9 +369,9 @@ Odd-only values: `BLUR_KERNEL_PX`, `THRESHOLD_BLOCK_SIZE_PX`, `BACKGROUND_SMOOTH
 | Feature | Measurement | Curve | Parameters | Full score when |
 |---|---|---|---|---|
 | `textSize` | `textHeightCanvasRatio` | sweet-spot | (0.005, 0.010, 0.025, 0.050) | 1-2.5% of canvas height |
-| `xHeight` | `xHeightTextRatio` | sweet-spot | (0.30, 0.50, 0.85, 1.10) | 50-85% of median letter height |
+| `xHeight` | `xHeightAscenderRatio` | sweet-spot | (0.30, 0.45, 0.75, 0.95) | small letters 45-75% of tall letters' height |
 | `baselineConsistency` | `baselineVariationRatio` | decreasing | (0.10, 0.80) | at most 10% of lowercase body height |
-| `shapeConsistency` | `slantStdDeg` | decreasing | (2.0, 20.0) | at most 2 degrees |
+| `shapeConsistency` | mean of `slantStdDeg` and `letterHeightCv` | decreasing | (2.0, 20.0) and (0.05, 0.35) | slant spread at most 2 degrees; same-group heights within 5% |
 | `strokeContrast` | `strokeContrastRatio` | decreasing | (1.2, 4.0) | ratio at most 1.2 |
 | `strokeWeight` | `strokeWidthRatio` | sweet-spot | (0.02, 0.06, 0.18, 0.35) | 6-18% of lowercase body height |
 | `letterSpacing` | `relativeLetterSpacing` | sweet-spot | (0.0, 0.15, 0.6, 1.2) | 0.15-0.6 x-height |
@@ -405,18 +413,18 @@ identity with inconsistency, so `shapeConsistency` is now slant only); 1.4 made 
 ## 9. Testing
 
 ```bash
-python3 -m pytest                      # all 92
+python3 -m pytest                      # all 105
 python3 -m pytest tests/test_api.py    # one file
 python3 -m pytest -k deskew            # tests whose name contains "deskew"
 ```
 
 | File | Tests | Covers |
 |---|---|---|
-| `test_api.py` | 19 | full requests: complete results, page found automatically or via corners, every error code, check order, HTTP 422, OCR never changing the score |
-| `test_image_pipeline.py` | 21 | lines, components, i-dots, deskew, rotation, page detection, lighting correction, contrast, sharpness |
+| `test_api.py` | 24 | full requests: complete results, page found automatically or via corners, every error code, check order, HTTP 422, OCR never changing the score |
+| `test_image_pipeline.py` | 22 | lines, components, i-dots, deskew, rotation, page detection, lighting correction, contrast, sharpness |
 | `test_scoring.py` | 12 | curves, missing values, weight rescaling, bands, rounding, every measurement has one curve |
 | `test_issues.py` | 11 | floating and sunken letters, descenders left alone, leaning letters, gaps, clusters, page-wide marks |
-| `test_measurements.py` | 9 | each measurement on drawn shapes with known answers |
+| `test_measurements.py` | 16 | each measurement on drawn shapes with known answers; height groups (descenders vs sunken letters, within-group evenness) |
 | `test_advice.py` | 9 | template coverage and placeholders, direction, weakest-first, at most three |
 | `test_schemas.py` | 6 | fixtures validate; unknown fields rejected; Python and TypeScript field names match |
 | `test_ocr.py` | 5 | confidence weighting, no text, model load failure, OCR disabled |

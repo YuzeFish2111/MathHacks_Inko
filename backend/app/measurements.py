@@ -1,6 +1,8 @@
-"""The eight featureMeasurements.
+"""The nine featureMeasurements.
 
 Measurements use pixel ratios and degrees; physical dimensions are warning-only.
+Height comparisons only compare letters within the same height group (x-height letters, ascenders,
+descenders): see classify_height_groups.
 Any measurement that cannot be estimated reliably is None (null), never 0.
 Only components of kind "letter" are used for shape and size; "mark" (dots, punctuation)
 and "cluster" (joined letters) would distort them.
@@ -14,7 +16,9 @@ from scipy import stats
 
 from .image_pipeline import LetterComponent, TextLine
 from .scoring_config import (MIN_COMPONENTS_FOR_STATS, MIN_GAPS_FOR_STATS, MIN_LETTERS_FOR_BASELINE,
-                             X_HEIGHT_ROW_FRACTION, WORD_GAP_MIN_RATIO)
+                             X_HEIGHT_ROW_FRACTION, WORD_GAP_MIN_RATIO, X_HEIGHT_GROUP_MAX_RATIO,
+                             ASCENDER_MIN_RATIO, DESCENDER_MIN_RATIO, DESCENDER_TOP_MIN_RATIO,
+                             MIN_HEIGHT_GROUP_SIZE)
 
 # Median absolute deviation (MAD) x 1.4826 equals the standard deviation for normally distributed data,
 # but a few extreme values (descenders, stray marks) barely move it. 1.4826 = 1 / 0.6745, where 0.6745
@@ -98,20 +102,107 @@ def fit_baseline(line: TextLine) -> Optional[tuple[float, float]]:
     return float(slope), float(intercept)
 
 
-def measure_baseline_variation_px(textLines: list[TextLine]) -> Optional[float]:
+def classify_height_groups(textLines: list[TextLine]) -> dict[str, str]:
+    """componentId -> height group, for letters on lines with a fitted baseline.
+
+    Groups: "xHeight" (a, e, o ...), "ascender" (b, d, h, k, l, capitals), "descender" (g, j, p, q, y),
+    "ascenderDescender" (both, e.g. a looped f), or "intermediate" (between groups; never compared).
+    Heights are multiples of the line's typical body height: the median height above the baseline, which
+    tracks the x-height because most letters are x-height letters. A descender must keep its top level;
+    a letter whose top AND bottom are low has sunk below the line, so it stays in its group.
+    """
+    groups = {}
+    for line in textLines:
+        baseline = fit_baseline(line)
+        if baseline is None:
+            continue
+        slope, intercept = baseline
+        letters = [component for component in line.components if component.kind == "letter"]
+        baselinesYPx = [slope * (letter.xPx + letter.widthPx / 2) + intercept for letter in letters]
+        heightsAbovePx = [baselineYPx - letter.yPx for letter, baselineYPx in zip(letters, baselinesYPx)]
+        typicalBodyPx = float(np.median(heightsAbovePx))
+        if typicalBodyPx <= 0:
+            continue
+        for letter, baselineYPx, heightAbovePx in zip(letters, baselinesYPx, heightsAbovePx):
+            aboveRatio = heightAbovePx / typicalBodyPx
+            belowRatio = (letter.yPx + letter.heightPx - baselineYPx) / typicalBodyPx
+            isAscender = aboveRatio >= ASCENDER_MIN_RATIO
+            isDescender = belowRatio > DESCENDER_MIN_RATIO and aboveRatio >= DESCENDER_TOP_MIN_RATIO
+            if isAscender and isDescender:
+                groups[letter.componentId] = "ascenderDescender"
+            elif isAscender:
+                groups[letter.componentId] = "ascender"
+            elif isDescender:
+                groups[letter.componentId] = "descender"
+            elif aboveRatio <= X_HEIGHT_GROUP_MAX_RATIO:
+                groups[letter.componentId] = "xHeight"
+            else:
+                groups[letter.componentId] = "intermediate"
+    return groups
+
+
+def _heights_by_group(textLines: list[TextLine], heightGroups: dict[str, str]) -> dict[str, list[int]]:
+    """Letter heights in px, collected per height group."""
+    heightsPx: dict[str, list[int]] = {}
+    for letter in _letters(textLines):
+        group = heightGroups.get(letter.componentId)
+        if group is not None:
+            heightsPx.setdefault(group, []).append(letter.heightPx)
+    return heightsPx
+
+
+def measure_x_height_ascender_ratio(textLines: list[TextLine], heightGroups: dict[str, str]) -> Optional[float]:
+    """Median x-height-letter height / median ascender height (the typographic x-height proportion).
+
+    Compares one height group with another instead of mixing them. None unless both groups
+    have at least MIN_HEIGHT_GROUP_SIZE letters.
+    """
+    heightsPx = _heights_by_group(textLines, heightGroups)
+    xHeightsPx, ascenderHeightsPx = heightsPx.get("xHeight", []), heightsPx.get("ascender", [])
+    if len(xHeightsPx) < MIN_HEIGHT_GROUP_SIZE or len(ascenderHeightsPx) < MIN_HEIGHT_GROUP_SIZE:
+        return None
+    return _ratio(float(np.median(xHeightsPx)), float(np.median(ascenderHeightsPx)))
+
+
+def measure_letter_height_cv(textLines: list[TextLine], heightGroups: dict[str, str]) -> Optional[float]:
+    """How much letters vary in height within their own height group (0 = every group perfectly even).
+
+    Each letter's height is divided by its group's median height, so x-height letters are only compared
+    with x-height letters and ascenders with ascenders; the normalised heights are pooled and their
+    standard deviation returned (a coefficient of variation, since their median is 1). Descenders and
+    in-between letters are left out: there are too few of them, and their shapes vary naturally.
+    """
+    normalisedHeights = []
+    for group in ("xHeight", "ascender"):
+        groupHeightsPx = _heights_by_group(textLines, heightGroups).get(group, [])
+        if len(groupHeightsPx) >= MIN_HEIGHT_GROUP_SIZE:
+            groupMedianPx = float(np.median(groupHeightsPx))
+            normalisedHeights.extend(heightPx / groupMedianPx for heightPx in groupHeightsPx)
+    if len(normalisedHeights) < MIN_COMPONENTS_FOR_STATS:
+        return None
+    return float(np.std(normalisedHeights))
+
+
+def measure_baseline_variation_px(textLines: list[TextLine],
+                                  heightGroups: Optional[dict[str, str]] = None) -> Optional[float]:
     """Spread of letter bottoms around each line's fitted baseline.
 
-    The spread is a robust standard deviation (1.4826 x median absolute deviation), so
-    descenders (g, j, p, q, y) do not dominate the result.
+    Only letters that should sit on the baseline are compared: descenders (g, j, p, q, y) hang below it
+    by design, so they are left out when heightGroups is given. The spread is a robust standard
+    deviation (1.4826 x median absolute deviation), so a few odd letters don't dominate.
     """
+    heightGroups = heightGroups or {}
     residualsPx = []
     for line in textLines:
         baseline = fit_baseline(line)
         if baseline is None:
             continue
         slope, intercept = baseline
-        centersXPx, bottomsPx = _letter_bottoms_px(line)
-        residualsPx.extend(bottomsPx - (slope * centersXPx + intercept))
+        for letter in line.components:
+            if letter.kind != "letter" or heightGroups.get(letter.componentId) in ("descender", "ascenderDescender"):
+                continue
+            centerXPx = letter.xPx + letter.widthPx / 2
+            residualsPx.append(letter.yPx + letter.heightPx - (slope * centerXPx + intercept))
     if len(residualsPx) < MIN_COMPONENTS_FOR_STATS:
         return None
     residualsPx = np.array(residualsPx)
@@ -217,24 +308,27 @@ def measure_letter_spacing_cv(letterGapsPx: list[float]) -> Optional[float]:
     return _cv(letterGapsPx, minCount=MIN_GAPS_FOR_STATS)
 
 
-# ---------- all eight ----------
+# ---------- all nine ----------
 
 def compute_feature_measurements(inkMask: np.ndarray, textLines: list[TextLine],
-                                 canvasHeightPx: int) -> dict[str, Optional[float]]:
-    """Return featureMeasurements with all eight canonical keys.
+                                 canvasHeightPx: Optional[int]) -> dict[str, Optional[float]]:
+    """Return featureMeasurements with all nine canonical keys.
 
-    canvasHeightPx is the page height before deskew expands the image.
+    canvasHeightPx is the page height before deskew expands the image, or None when the page edges
+    weren't found (then the whole photo isn't a meaningful reference, so textHeightCanvasRatio is None).
     """
     xHeightPx = measure_x_height_px(inkMask, textLines)
     strokeWidthsPx = measure_stroke_widths_px(inkMask)
     letterGapsPx = find_letter_gaps_px(textLines)
     textHeightPx = measure_text_size_px(textLines)
+    heightGroups = classify_height_groups(textLines)
 
     return {
-        "textHeightCanvasRatio":            _ratio(textHeightPx, canvasHeightPx),
-        "xHeightTextRatio":             _ratio(xHeightPx, textHeightPx),
-        "baselineVariationRatio":   _ratio(measure_baseline_variation_px(textLines), xHeightPx),
-        "slantStdDeg":           measure_slant_std_deg(textLines),
+        "textHeightCanvasRatio":  _ratio(textHeightPx, canvasHeightPx),
+        "xHeightAscenderRatio":   measure_x_height_ascender_ratio(textLines, heightGroups),
+        "baselineVariationRatio": _ratio(measure_baseline_variation_px(textLines, heightGroups), xHeightPx),
+        "slantStdDeg":            measure_slant_std_deg(textLines),
+        "letterHeightCv":         measure_letter_height_cv(textLines, heightGroups),
         "strokeContrastRatio":   measure_stroke_contrast_ratio(strokeWidthsPx),
         "strokeWidthRatio":   _ratio(measure_stroke_width_median_px(strokeWidthsPx), xHeightPx),
         "relativeLetterSpacing": measure_relative_letter_spacing(letterGapsPx, xHeightPx),

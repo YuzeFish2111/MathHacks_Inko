@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2.0",
+  "schemaVersion": "2.1",
   "status": "complete",
   "error": null,
   "legibilityScore": 78,
@@ -8,9 +8,10 @@
   "recognizedText": "The quick brown fox\njumps over the lazy dog.",
   "featureMeasurements": {
     "textHeightCanvasRatio": 0.020875420875420877,
-    "xHeightTextRatio": 0.5,
+    "xHeightAscenderRatio": 0.6,
     "baselineVariationRatio": 0.25806451612903225,
     "slantStdDeg": 5.4,
+    "letterHeightCv": 0.12,
     "strokeContrastRatio": 1.8,
     "strokeWidthRatio": 0.13548387096774192,
     "relativeLetterSpacing": 0.31,

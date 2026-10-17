@@ -7,8 +7,8 @@ from app.scoring import compute_feature_scores
 from app.scoring_config import SWEET_SPOT_CURVES, DECREASING_CURVES, FEATURE_SOURCES, MAX_ADVICE_ITEMS
 
 PERFECT_MEASUREMENTS = {
-    "textHeightCanvasRatio": 0.02, "xHeightTextRatio": 0.7,
-    "baselineVariationRatio": 0.05, "slantStdDeg": 1.0,
+    "textHeightCanvasRatio": 0.02, "xHeightAscenderRatio": 0.6,
+    "baselineVariationRatio": 0.05, "slantStdDeg": 1.0, "letterHeightCv": 0.03,
     "strokeContrastRatio": 1.1, "strokeWidthRatio": 0.1,
     "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1,
 }

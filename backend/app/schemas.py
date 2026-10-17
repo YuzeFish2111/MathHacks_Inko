@@ -8,7 +8,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "2.1"    # 2.0: ratios instead of mm; 2.1: height-group comparisons
 
 # Literal[...] = only these exact strings are allowed; any other value fails validation
 FeatureId = Literal["textSize", "xHeight", "baselineConsistency", "shapeConsistency",
@@ -51,11 +51,12 @@ class QualityCheck(ContractModel):
 
 
 class FeatureMeasurements(ContractModel):
-    """The eight raw measurements. None (null) means it could not be estimated; 0 is a real value."""
+    """The nine raw measurements. None (null) means it could not be estimated; 0 is a real value."""
     textHeightCanvasRatio: Optional[float]
-    xHeightTextRatio: Optional[float]
+    xHeightAscenderRatio: Optional[float]
     baselineVariationRatio: Optional[float]
     slantStdDeg: Optional[float]
+    letterHeightCv: Optional[float]
     strokeContrastRatio: Optional[float]
     strokeWidthRatio: Optional[float]
     relativeLetterSpacing: Optional[float]
@@ -124,7 +125,7 @@ class AdviceItem(ContractModel):
 # ---------- full response ----------
 
 class AnalysisResponse(ContractModel):
-    schemaVersion: Literal["2.0"]
+    schemaVersion: Literal["2.1"]
     status: AnalysisStatus
     error: Optional[AnalysisError]
     legibilityScore: Optional[int] = Field(ge=0, le=100)    # whole number for display; see scoring.py

@@ -23,9 +23,9 @@ FEATURE_IDS = ("textSize", "xHeight", "baselineConsistency", "shapeConsistency",
 # featureId -> source measurement(s); a feature with several sources is the mean of their available scores
 FEATURE_SOURCES = {
     "textSize":            ("textHeightCanvasRatio",),
-    "xHeight":             ("xHeightTextRatio",),
+    "xHeight":             ("xHeightAscenderRatio",),
     "baselineConsistency": ("baselineVariationRatio",),
-    "shapeConsistency":    ("slantStdDeg",),
+    "shapeConsistency":    ("slantStdDeg", "letterHeightCv"),
     "strokeContrast":      ("strokeContrastRatio",),
     "strokeWeight":        ("strokeWidthRatio",),
     "letterSpacing":       ("relativeLetterSpacing",),
@@ -39,7 +39,7 @@ FEATURE_WEIGHTS = {featureId: 1 / len(FEATURE_IDS) for featureId in FEATURE_IDS}
 
 SWEET_SPOT_CURVES = {          # (a, b, c, d); placeholder values, not yet calibrated
     "textHeightCanvasRatio":            (0.005, 0.010, 0.025, 0.050),
-    "xHeightTextRatio":             (0.30, 0.50, 0.85, 1.10),
+    "xHeightAscenderRatio":  (0.30, 0.45, 0.75, 0.95),   # x-height letters / ascenders (school model 0.5, print ~0.7)
     "strokeWidthRatio":   (0.02, 0.06, 0.18, 0.35),
     "relativeLetterSpacing": (0.0, 0.15, 0.6, 1.2),
 }
@@ -48,6 +48,7 @@ DECREASING_CURVES = {          # (perfect value v0, zero-score value v1)
     "slantStdDeg":         (2.0, 20.0),
     "strokeContrastRatio": (1.2, 4.0),
     "letterSpacingCv":     (0.15, 1.0),
+    "letterHeightCv":      (0.05, 0.35),   # height spread within each height group (x-height letters, ascenders)
 }
 SCORE_BANDS = ((85, "Very legible"), (70, "Readable"), (50, "Some difficulty"), (0, "Hard to read"))
 
@@ -114,6 +115,14 @@ MIN_GAPS_FOR_STATS = 4          # fewer within-word letter gaps than this -> spa
 MIN_LETTERS_FOR_BASELINE = 3    # a line needs this many letters to fit its baseline
 X_HEIGHT_ROW_FRACTION = 0.5     # rows with >= this fraction of a line's peak ink form the x-height band
 WORD_GAP_MIN_RATIO = 2.5        # gap wider than this x the line's median gap -> word gap, not letter gap
+# Height groups: letters are only compared with letters of the same height group. Ratios are multiples of
+# the line's typical body height (median height above the baseline; most letters are x-height letters)
+X_HEIGHT_GROUP_MAX_RATIO = 1.12 # top at most this high -> x-height letter (a, e, o, n ...; print ~0.96-1.00)
+ASCENDER_MIN_RATIO = 1.20       # top at least this high -> ascender (b, d, h, k, l, capitals; print ~1.3,
+                                # handwriting ~1.5-2.0); between the two -> excluded, never compared
+DESCENDER_MIN_RATIO = 0.25      # tail more than this below the baseline ...
+DESCENDER_TOP_MIN_RATIO = 0.75  # ... with the top still at least this high -> descender (g, p, y); else a sunken letter
+MIN_HEIGHT_GROUP_SIZE = 3       # a group needs this many letters to be compared
 # Broad warning defaults for ordinary handwriting; never used in scoring.
 MIN_TEXT_HEIGHT_MM = 2.0
 MAX_TEXT_HEIGHT_MM = 10.0

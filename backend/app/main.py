@@ -287,7 +287,9 @@ async def analyze(
     except PhotoProblem as problem:
         return needs_better_photo_response(problem, qualityChecks)
 
-    featureMeasurements = compute_feature_measurements(inkMask, textLines, canvasHeightPx)
+    # Without page edges the photo's own height isn't a page reference, so the canvas ratio is skipped
+    featureMeasurements = compute_feature_measurements(inkMask, textLines,
+                                                       canvasHeightPx if boundsKnown else None)
     append_text_size_warning(featureMeasurements, fields, canvasHeightPx, canvasWidthPx, boundsKnown, warnings)
     scoring = score_measurements(featureMeasurements)
     if scoring["missingFeatureIds"]:

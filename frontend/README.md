@@ -34,7 +34,7 @@ uvicorn app.main:app --reload
 ```
 
 Check it's running:
-- http://127.0.0.1:8000/api/health should show `{"status":"ok","schemaVersion":"1.4"}`
+- http://127.0.0.1:8000/api/health should show `{"status":"ok","schemaVersion":"2.1"}`
 - http://127.0.0.1:8000/docs lets you upload a photo by hand and see the real response
 
 Keep this terminal open while you work on the frontend.
@@ -281,17 +281,21 @@ the need to copy).
 
 | featureId | Label | Measurement | Unit | Ideal | Curve and parameters |
 |---|---|---|---|---|---|
-| `textSize` | Letter size | `textSizeMm` | mm | 3.0-7.0 | sweet-spot (1.5, 3.0, 7.0, 12.0) |
-| `xHeight` | Small-letter height | `xHeightMm` | mm | 2.0-4.5 | sweet-spot (1.0, 2.0, 4.5, 8.0) |
-| `baselineConsistency` | Staying on the line | `baselineVariationMm` | mm | 0.3 or less | decreasing (0.3, 2.5) |
-| `shapeConsistency` | Consistent slant | `slantStdDeg` | degrees | 2 or less | decreasing (2.0, 20.0) |
+| `textSize` | Letter size | `textHeightCanvasRatio` | % of page height (x 100) | 1.0-2.5% | sweet-spot (0.005, 0.010, 0.025, 0.050) |
+| `xHeight` | Small vs tall letters | `xHeightAscenderRatio` | % of tall letters' height (x 100) | 45-75% | sweet-spot (0.30, 0.45, 0.75, 0.95) |
+| `baselineConsistency` | Staying on the line | `baselineVariationRatio` | % of small-letter height (x 100) | 10% or less | decreasing (0.10, 0.80) |
+| `shapeConsistency` | Consistent slant and height | `slantStdDeg` and `letterHeightCv` (average of both scores) | degrees; % (x 100) | 2 or less; 5% or less | decreasing (2.0, 20.0); decreasing (0.05, 0.35) |
 | `strokeContrast` | Even pen pressure | `strokeContrastRatio` | x (ratio) | 1.2 or less | decreasing (1.2, 4.0) |
-| `strokeWeight` | Pen thickness | `strokeWidthMedianMm` | mm | 0.3-0.8 | sweet-spot (0.1, 0.3, 0.8, 1.5) |
+| `strokeWeight` | Pen thickness | `strokeWidthRatio` | % of small-letter height (x 100) | 6-18% | sweet-spot (0.02, 0.06, 0.18, 0.35) |
 | `letterSpacing` | Space between letters | `relativeLetterSpacing` | x letter height | 0.15-0.6 | sweet-spot (0.0, 0.15, 0.6, 1.2) |
 | `spacingConsistency` | Even spacing | `letterSpacingCv` | % variation (x 100) | 15% or less | decreasing (0.15, 1.0) |
 
 All eight features currently weigh 1/8. Sweet-spot (a, b, c, d): 0 outside a..d, rising a->b, 1 from
 b to c, falling c->d. Decreasing (v0, v1): 1 at or below v0, falling in a straight line to 0 at v1.
+`shapeConsistency` is the average of its two measurements' scores (just one if the other is null).
+Since contract 2.0 all measurements are ratios (no mm); `textHeightCanvasRatio` is null when the page
+edges weren't found. Height measures only compare letters of the same height group (see
+`shared/analysis-contract.md`, "Height groups").
 
 ### Overlay canvas (`src/components/OverlayCanvas.tsx`)
 
@@ -390,7 +394,8 @@ export function legibilityScore(scores: Partial<Record<FeatureId, number | null>
 
 **Consistency check (do this first):** with the mock response, `legibilityScore(featureScores, weights)`
 must equal the response's `legibilityScore`, and `scoreOnCurve(measurement, curve)` must equal each
-`featureScores` value (to about 0.001). If not, the TypeScript copy has drifted from the backend.
+`featureScores` value (to about 0.001); for `shapeConsistency`, average the scores of `slantStdDeg`
+and `letterHeightCv`, skipping a null one. If not, the TypeScript copy has drifted from the backend.
 
 ### Build now: these need only the current API response
 

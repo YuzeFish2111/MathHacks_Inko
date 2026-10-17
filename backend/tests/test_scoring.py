@@ -37,8 +37,8 @@ def test_missing_values_stay_null():
 # ---------- feature scores, legibilityScore, scoreLabel ----------
 
 PERFECT_MEASUREMENTS = {
-    "textHeightCanvasRatio": 0.02, "xHeightTextRatio": 0.7,
-    "baselineVariationRatio": 0.05, "slantStdDeg": 1.0,
+    "textHeightCanvasRatio": 0.02, "xHeightAscenderRatio": 0.6,
+    "baselineVariationRatio": 0.05, "slantStdDeg": 1.0, "letterHeightCv": 0.03,
     "strokeContrastRatio": 1.1, "strokeWidthRatio": 0.1,
     "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1,
 }
@@ -76,7 +76,8 @@ def test_feature_with_several_sources_averages_only_available_ones(monkeypatch):
 
 
 def test_missing_features_are_excluded_not_counted_as_zero_or_perfect():
-    measurements = dict(PERFECT_MEASUREMENTS, textHeightCanvasRatio=None, xHeightTextRatio=None, slantStdDeg=25.0)
+    measurements = dict(PERFECT_MEASUREMENTS, textHeightCanvasRatio=None, xHeightAscenderRatio=None,
+                        slantStdDeg=25.0, letterHeightCv=None)   # shapeConsistency then rests on slant alone
     featureScores = compute_feature_scores(measurements)
     legibilityScore, featureWeights, missingFeatureIds = compute_legibility_score(featureScores)
 

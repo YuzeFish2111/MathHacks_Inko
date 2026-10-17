@@ -81,7 +81,7 @@ MathHacks_Project/
     `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results
 
 
-BACKEND PROGRESS  (92/92 tests passing; tested on synthetic images, first real photos tried)
+BACKEND PROGRESS  (105/105 tests passing; tested on synthetic images, first real photos tried)
 ================================================================
 Plan step                                   Status
 0. Lock contract                            [x] contract, fixtures, schemas.py, analysis.ts, drift tests
@@ -182,7 +182,7 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
 backend/scripts/  (developer tools, run by hand)
   preview_ink_mask.py    Shows a photo next to its ink mask, for checking thresholds by eye.
 
-backend/tests/  (92 automated tests; run with: cd backend && python3 -m pytest)
+backend/tests/  (105 automated tests; run with: cd backend && python3 -m pytest)
   conftest.py            Stops tests loading the real OCR model; tests that need OCR use a fake.
   test_ocr.py            OCR confidence weighting, no-text case, model load failure, OCR switched off.
   test_api.py            Uploads real requests: complete results, page detection, every error code.

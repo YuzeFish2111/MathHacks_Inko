@@ -2,7 +2,7 @@
 // Must match backend/app/schemas.py field-for-field; see shared/analysis-contract.md.
 // null means "could not be estimated"; 0 is a real measurement.
 
-export const SCHEMA_VERSION = "2.0";
+export const SCHEMA_VERSION = "2.1"; // 2.0: ratios instead of mm; 2.1: height-group comparisons
 
 export type FeatureId =
   | "textSize"
@@ -68,9 +68,12 @@ export interface QualityCheck {
 /** The eight raw measurements. */
 export interface FeatureMeasurements {
   textHeightCanvasRatio: number | null;
-  xHeightTextRatio: number | null;
+  /** Median x-height-letter height / median ascender height. */
+  xHeightAscenderRatio: number | null;
   baselineVariationRatio: number | null;
   slantStdDeg: number | null;
+  /** Height spread within each height group (x-height letters, ascenders), pooled. */
+  letterHeightCv: number | null;
   strokeContrastRatio: number | null;
   strokeWidthRatio: number | null;
   relativeLetterSpacing: number | null;
@@ -133,7 +136,7 @@ export interface AdviceItem {
 // ---------- full response ----------
 
 export interface AnalysisResponse {
-  schemaVersion: "2.0";
+  schemaVersion: "2.1";
   status: AnalysisStatus;
   error: AnalysisError | null;
   /** Final 0-100 score, or null. */

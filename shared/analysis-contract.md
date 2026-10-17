@@ -45,9 +45,10 @@ field-for-field. Example responses: `shared/fixtures/`.
 | Name | Meaning |
 |---|---|
 | `textHeightCanvasRatio` | Median letter height / pre-deskew canvas height |
-| `xHeightTextRatio` | Estimated lowercase-body height / median letter height |
-| `baselineVariationRatio` | Robust baseline variation / lowercase-body height |
+| `xHeightAscenderRatio` | Median x-height-letter height / median ascender height (only same-group letters compared) |
+| `baselineVariationRatio` | Robust baseline variation (descenders excluded) / lowercase-body height |
 | `slantStdDeg` | Std. deviation of estimated slant, degrees |
+| `letterHeightCv` | Height spread within each height group (x-height letters with x-height letters, ascenders with ascenders), pooled |
 | `strokeContrastRatio` | 90th / 10th percentile stroke width |
 | `strokeWidthRatio` | Median stroke width / lowercase-body height |
 | `relativeLetterSpacing` | Median within-word letter gap / x-height; unitless |
@@ -66,9 +67,9 @@ field-for-field. Example responses: `shared/fixtures/`.
 | featureId | Source measurement | Curve |
 |---|---|---|
 | `textSize` | `textHeightCanvasRatio` | sweet-spot |
-| `xHeight` | `xHeightTextRatio` | sweet-spot |
+| `xHeight` | `xHeightAscenderRatio` | sweet-spot |
 | `baselineConsistency` | `baselineVariationRatio` | decreasing |
-| `shapeConsistency` | `slantStdDeg` | decreasing |
+| `shapeConsistency` | mean of `slantStdDeg` and `letterHeightCv` | decreasing |
 | `strokeContrast` | `strokeContrastRatio` | decreasing |
 | `strokeWeight` | `strokeWidthRatio` | sweet-spot |
 | `letterSpacing` | `relativeLetterSpacing` | sweet-spot |
@@ -104,7 +105,7 @@ Rotating the photo (the preview screen's "Rotate 90°" button) happens in the br
 so `cornerPointsPx` and every overlay coordinate refer to that image. No extra field is sent.
 
 ### Response
-- `schemaVersion`: `"2.0"`.
+- `schemaVersion`: `"2.1"`.
 - `status`: `"complete"` or `"needs_better_photo"`.
 - `error`: `null`, or `{ "code": string, "message": string }`.
 - `qualityChecks` item: `{ "checkId": string, "passed": boolean, "message": string | null }`.
@@ -128,6 +129,18 @@ Full examples (illustrative values only, not calibrated):
 
 - `shared/fixtures/complete-response.json`
 - `shared/fixtures/needs-better-photo-response.json`
+
+## Height groups (2.1)
+
+Letters are only compared with letters of the same height. Each letter is assigned a group from its
+height above the line's fitted baseline, in multiples of the line's typical body height (the median,
+which tracks the x-height): x-height letters (top <= 1.12), ascenders (top >= 1.20), descenders (tail
+> 0.25 below the baseline with the top still >= 0.75, so a sunken letter isn't excused as a descender),
+and in-between letters, which are never compared. `xHeightAscenderRatio` compares the two
+main groups; `letterHeightCv` measures evenness within each group; `baselineVariationRatio` ignores
+descenders. `textHeightCanvasRatio` is null when the page edges weren't found (the photo's own height
+isn't a page reference). Thresholds are `X_HEIGHT_GROUP_MAX_RATIO`, `ASCENDER_MIN_RATIO`,
+`DESCENDER_MIN_RATIO`, `DESCENDER_TOP_MIN_RATIO` and `MIN_HEIGHT_GROUP_SIZE` in `scoring_config.py`.
 
 ## Ratio geometry and physical warnings (2.0)
 
