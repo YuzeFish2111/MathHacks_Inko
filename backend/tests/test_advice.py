@@ -7,8 +7,8 @@ from app.scoring import compute_feature_scores
 from app.scoring_config import SWEET_SPOT_CURVES, DECREASING_CURVES, FEATURE_SOURCES, MAX_ADVICE_ITEMS
 
 PERFECT_MEASUREMENTS = {
-    "textSizeMm": 5.0, "xHeightMm": 3.0, "baselineVariationMm": 0.2, "aspectRatioCv": 0.05,
-    "solidityCv": 0.02, "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthMedianMm": 0.5,
+    "textHeightCanvasRatio": 0.02, "xHeightTextRatio": 0.7, "baselineVariationRatio": 0.05, "aspectRatioCv": 0.05,
+    "solidityCv": 0.02, "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthRatio": 0.1,
     "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1,
 }
 
@@ -37,11 +37,11 @@ def test_perfect_writing_gets_no_advice():
 
 
 def test_sweet_spot_direction_low_and_high():
-    small = advice_for(textSizeMm=2.0)
+    small = advice_for(textHeightCanvasRatio=0.0075)
     assert small[0]["featureId"] == "textSize" and small[0]["title"] == "Write a little bigger"
-    assert "2.0 mm" in small[0]["message"] and "3.0-7.0 mm" in small[0]["message"]
+    assert "0.8%" in small[0]["message"] and "1.0-2.5%" in small[0]["message"]
 
-    big = advice_for(textSizeMm=10.0)
+    big = advice_for(textHeightCanvasRatio=0.04)
     assert big[0]["title"] == "Write a little smaller"
 
 
@@ -58,8 +58,8 @@ def test_shape_consistency_describes_its_weakest_source():
 
 
 def test_weakest_first_and_at_most_three():
-    advice = advice_for(textSizeMm=1.0,               # score 0
-                        baselineVariationMm=1.95,     # score ~0.25
+    advice = advice_for(textHeightCanvasRatio=0.001,               # score 0
+                        baselineVariationRatio=0.625,     # score ~0.25
                         letterSpacingCv=0.575,        # score 0.5
                         strokeContrastRatio=2.6)      # score 0.5 (ties keep FEATURE_IDS order)
     assert len(advice) == MAX_ADVICE_ITEMS
@@ -67,8 +67,8 @@ def test_weakest_first_and_at_most_three():
 
 
 def test_missing_features_get_no_advice():
-    assert advice_for(textSizeMm=None, letterSpacingCv=None) == []
-    assert build_advice_item("textSize", {"textSizeMm": None}) is None
+    assert advice_for(textHeightCanvasRatio=None, letterSpacingCv=None) == []
+    assert build_advice_item("textSize", {"textHeightCanvasRatio": None}) is None
 
 
 def test_every_template_produces_a_valid_advice_item():

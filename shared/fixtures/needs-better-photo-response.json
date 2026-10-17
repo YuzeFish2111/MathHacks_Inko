@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "2.0",
   "status": "needs_better_photo",
   "error": {
     "code": "BLUR_TOO_HIGH",
@@ -14,8 +14,11 @@
   "missingFeatureIds": [],
   "warnings": [],
   "qualityChecks": [
-    { "checkId": "blur", "passed": false,
-      "message": "The photo looks blurry." }
+    {
+      "checkId": "blur",
+      "passed": false,
+      "message": "The photo looks blurry."
+    }
   ],
   "overlayData": null,
   "advice": []

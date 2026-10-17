@@ -139,32 +139,44 @@ def max_corner_error_px(found, expected):
 
 def test_detects_a_keystoned_page_on_dark_and_light_desks():
     for deskLevel in (90, 200):        # 90: brightness mask finds it; 200: edge mask is needed
-        found = detect_page_corners(photo_of_page_on_desk(deskLevel, KEYSTONED_CORNERS), 210, 297)
+        found = detect_page_corners(photo_of_page_on_desk(deskLevel, KEYSTONED_CORNERS))
         assert found is not None and max_corner_error_px(found, KEYSTONED_CORNERS) <= 6, deskLevel
 
 
 def test_detects_a_rotated_page_and_returns_corners_in_order():
     corners = [[400, 150], [1350, 280], [1150, 1650], [180, 1520]]      # about 8 degrees clockwise
-    found = detect_page_corners(photo_of_page_on_desk(150, corners), 210, 297)
+    found = detect_page_corners(photo_of_page_on_desk(150, corners))
     assert found is not None and max_corner_error_px(found, corners) <= 6
 
 
 def test_detects_a_smaller_page():
     corners = [[400, 400], [1100, 400], [1100, 1390], [400, 1390]]      # about 26% of the photo
-    assert detect_page_corners(photo_of_page_on_desk(90, corners), 210, 297) is not None
+    assert detect_page_corners(photo_of_page_on_desk(90, corners)) is not None
 
 
 def test_no_page_found_when_it_fills_the_frame_or_is_missing():
     fullFramePage = np.full((1414, 1000, 3), 255, np.uint8)
     cv2.putText(fullFramePage, "The quick brown fox", (80, 400), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 3)
-    assert detect_page_corners(fullFramePage, 210, 297) is None
+    assert detect_page_corners(fullFramePage) is None
     noise = (np.random.default_rng(1).random((1800, 1500, 3)) * 255).astype(np.uint8)
-    assert detect_page_corners(noise, 210, 297) is None
+    assert detect_page_corners(noise) is None
 
 
-def test_page_with_the_wrong_shape_is_rejected():
-    # A portrait page, but the user said landscape (297 x 210): don't stretch it to fit
-    assert detect_page_corners(photo_of_page_on_desk(90, KEYSTONED_CORNERS), 297, 210) is None
+def test_rectification_uses_corner_geometry():
+    from app.image_pipeline import rectify_page
+    photo = np.full((800, 1000, 3), 255, np.uint8)
+    page = rectify_page(photo, [[100, 100], [700, 100], [700, 500], [100, 500]])
+    assert page.shape[:2] == (667, 1000)
+
+
+def test_invalid_corner_geometry_is_rejected():
+    import pytest
+    from app.image_pipeline import rectify_page
+    photo = np.full((800, 1000, 3), 255, np.uint8)
+    for corners in ([[0, 0], [float("nan"), 0], [500, 500], [0, 500]],
+                    [[0, 0], [500, 500], [500, 0], [0, 500]]):
+        with pytest.raises(ValueError):
+            rectify_page(photo, corners)
 
 
 def lit_page(lighting):

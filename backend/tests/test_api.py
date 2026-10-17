@@ -38,7 +38,10 @@ def error_code(response):
 
 
 def test_health():
-    assert client.get("/api/health").json() == {"status": "ok", "schemaVersion": "1.1"}
+        assert client.get("/api/health").json() == {
+        "status": "ok",
+        "schemaVersion": "2.0",
+    }
 
 
 def test_complete_result_without_corners():
@@ -151,5 +154,60 @@ def test_bad_form_fields_are_http_422():
     assert post(png_bytes(make_page_photo()), cornerPointsPx="[[0, 0]]").status_code == 422
     assert client.post("/api/analyze", data={"pageWidthMm": "-5", "pageHeightMm": "297"},
                        files={"imageFile": ("p.png", png_bytes(make_page_photo()), "image/png")}).status_code == 422
-    assert client.post("/api/analyze", data={"pageHeightMm": "297"},
+    assert client.post("/api/analyze", data={"pageHeightMm": "nan"},
                        files={"imageFile": ("p.png", png_bytes(make_page_photo()), "image/png")}).status_code == 422
+
+
+def test_physical_dimensions_only_change_warnings():
+    image = png_bytes(make_page_photo())
+    corners = json.dumps([[0, 0], [999, 0], [999, 1413], [0, 1413]])
+    results = []
+    for dimensions in ({}, {"pageHeightMm": "30"}, {"pageHeightMm": "1000"},
+                       {"pageWidthMm": "20"}, {"pageWidthMm": "1000"}):
+        response = client.post("/api/analyze", data={**dimensions, "cornerPointsPx": corners},
+                               files={"imageFile": ("p.png", image, "image/png")})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "complete"
+        results.append(body)
+    assert not any("mm tall" in w for w in results[0]["warnings"])
+    assert any("Below 2 mm" in w for w in results[1]["warnings"])
+    assert any("Above 10 mm" in w for w in results[2]["warnings"])
+    assert any("Below 2 mm" in w for w in results[3]["warnings"])
+    assert any("Above 10 mm" in w for w in results[4]["warnings"])
+    for body in results[1:]:
+        for key in ("featureMeasurements", "featureScores", "legibilityScore", "rectifiedImage"):
+            assert body[key] == results[0][key]
+
+
+def test_missing_dimensions_are_accepted_without_corners():
+    response = client.post("/api/analyze", files={
+        "imageFile": ("p.png", png_bytes(make_page_photo()), "image/png")})
+    assert response.status_code == 200
+    assert response.json()["status"] == "complete"
+
+
+def test_size_warning_thresholds_and_missing_bounds():
+    from app.main import append_text_size_warning
+    from app.schemas import AnalyzeRequestFields
+    for height, expected in ((1.9, True), (2.0, False), (10.0, False), (10.1, True)):
+        warnings = []
+        append_text_size_warning({"textHeightCanvasRatio": height / 100},
+                                 AnalyzeRequestFields(pageHeightMm=100), 1000, 700, True, warnings)
+        assert bool(warnings) == expected
+    warnings = []
+    append_text_size_warning({"textHeightCanvasRatio": 0.001},
+                             AnalyzeRequestFields(pageHeightMm=100), 1000, 700, False, warnings)
+    assert warnings == []
+
+
+def test_prepare_page_keeps_canvas_dimensions_before_deskew(monkeypatch):
+    import app.main as main
+    from app.schemas import AnalyzeRequestFields
+    monkeypatch.setattr(main, "detect_page_corners", lambda image: None)
+    monkeypatch.setattr(main, "deskew", lambda image: (np.pad(image, ((10, 10), (20, 20))), 2.0))
+    page, height, width, bounds = main.prepare_page(
+        make_page_photo(), AnalyzeRequestFields(), [], [])
+    assert (height, width) == (1414, 1000)
+    assert page.shape == (1434, 1040)
+    assert bounds is False

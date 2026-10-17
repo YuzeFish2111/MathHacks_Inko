@@ -8,7 +8,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "2.0"
 
 # Literal[...] = only these exact strings are allowed; any other value fails validation
 FeatureId = Literal["textSize", "xHeight", "baselineConsistency", "shapeConsistency",
@@ -30,8 +30,8 @@ class ContractModel(BaseModel):
 
 class AnalyzeRequestFields(ContractModel):
     """The non-file form fields of POST /api/analyze (imageFile arrives separately as an upload)."""
-    pageWidthMm: float = Field(gt=0)
-    pageHeightMm: float = Field(gt=0)
+    pageWidthMm: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
+    pageHeightMm: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
     # Four [x, y] page corners in originalImage pixels: top-left, top-right, bottom-right, bottom-left.
     # Sent as a JSON string in the form; parse it before building this model.
     cornerPointsPx: Optional[list[tuple[float, float]]] = Field(default=None, min_length=4, max_length=4)
@@ -52,14 +52,14 @@ class QualityCheck(ContractModel):
 
 class FeatureMeasurements(ContractModel):
     """The ten raw measurements. None (null) means it could not be estimated; 0 is a real value."""
-    textSizeMm: Optional[float]
-    xHeightMm: Optional[float]
-    baselineVariationMm: Optional[float]
+    textHeightCanvasRatio: Optional[float]
+    xHeightTextRatio: Optional[float]
+    baselineVariationRatio: Optional[float]
     aspectRatioCv: Optional[float]
     solidityCv: Optional[float]
     slantStdDeg: Optional[float]
     strokeContrastRatio: Optional[float]
-    strokeWidthMedianMm: Optional[float]
+    strokeWidthRatio: Optional[float]
     relativeLetterSpacing: Optional[float]
     letterSpacingCv: Optional[float]
 
@@ -126,7 +126,7 @@ class AdviceItem(ContractModel):
 # ---------- full response ----------
 
 class AnalysisResponse(ContractModel):
-    schemaVersion: Literal["1.1"]
+    schemaVersion: Literal["2.0"]
     status: AnalysisStatus
     error: Optional[AnalysisError]
     legibilityScore: Optional[int] = Field(ge=0, le=100)    # whole number for display; see scoring.py

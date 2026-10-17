@@ -23,7 +23,7 @@ from .scoring_config import (TARGET_IMAGE_WIDTH_PX, BACKGROUND_KERNEL_PX, BACKGR
                              NEAR_LINE_MAX_GAP_RATIO, MARK_MAX_HEIGHT_RATIO, CLUSTER_MIN_WIDTH_RATIO,
                              DESKEW_MAX_ANGLE_DEG, DESKEW_STEP_DEG,
                              PAGE_DETECT_MAX_SIDE_PX, PAGE_MIN_AREA_FRACTION, PAGE_MAX_AREA_FRACTION,
-                             PAGE_ASPECT_TOLERANCE, PAGE_MIN_BRIGHTNESS_GAIN)
+                             PAGE_MIN_BRIGHTNESS_GAIN)
 
 
 @dataclass
@@ -48,47 +48,63 @@ class TextLine:
     bottomPx: int
     components: list[LetterComponent] = field(default_factory=list)    # sorted left to right
 
+def decode_heic(imageBytes: bytes) -> np.ndarray:
+    from io import BytesIO
+    from PIL import Image, ImageOps
+    from pillow_heif import register_heif_opener
+
+    register_heif_opener()
+
+    with Image.open(BytesIO(imageBytes)) as image:
+        rgb = ImageOps.exif_transpose(image).convert("RGB")
+        return cv2.cvtColor(np.array(rgb), cv2.COLOR_RGB2BGR)
 
 def load_image(path: str) -> np.ndarray:
-    """Read an image file from disk as a BGR array (originalImage)."""
-    originalImage = cv2.imread(path, cv2.IMREAD_COLOR)
-    if originalImage is None:
-        raise FileNotFoundError(f"Could not read image: {path}")
-    return originalImage
+    from pathlib import Path
+
+    return decode_image(Path(path).read_bytes())
 
 
 def decode_image(imageBytes: bytes) -> np.ndarray:
-    """Decode uploaded file bytes as a BGR array (originalImage); used by POST /api/analyze."""
     buffer = np.frombuffer(imageBytes, dtype=np.uint8)
     originalImage = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+
     if originalImage is None:
-        raise ValueError("Could not decode image")
+        try:
+            originalImage = decode_heic(imageBytes)
+        except Exception as error:
+            raise ValueError("Could not decode image") from error
+
     return originalImage
 
 
 def rectify_page(originalImage: np.ndarray, cornerPointsPx: list[tuple[float, float]],
-                 pageWidthMm: float, pageHeightMm: float,
                  targetWidthPx: int = TARGET_IMAGE_WIDTH_PX) -> np.ndarray:
     """Perspective-correct the page so it fills a flat rectangle (rectifiedImage).
 
     cornerPointsPx are the page corners in originalImage pixels, ordered top-left, top-right,
-    bottom-right, bottom-left. The output is targetWidthPx wide with the paper's real
-    proportions, so scaleMmPerPxX/Y = pageWidthMm / width and pageHeightMm / height.
+    bottom-right, bottom-left. Output proportions are estimated from opposite edge lengths.
+    This is approximate for strong perspective; physical dimensions never affect geometry.
     Raises ValueError if the corners fall outside the photo or enclose no area.
     """
     imageHeightPx, imageWidthPx = originalImage.shape[:2]
     sourceCorners = np.array(cornerPointsPx, dtype=np.float32)
     if sourceCorners.shape != (4, 2):
         raise ValueError("cornerPointsPx must be four [x, y] points")
+    if not np.isfinite(sourceCorners).all():
+        raise ValueError("cornerPointsPx must be finite")
     if (sourceCorners < 0).any() or (sourceCorners[:, 0] > imageWidthPx).any() \
             or (sourceCorners[:, 1] > imageHeightPx).any():
         raise ValueError("cornerPointsPx fall outside the photo")
-    if cv2.contourArea(sourceCorners) < 1:
+    if not cv2.isContourConvex(sourceCorners) or cv2.contourArea(sourceCorners) < 1:
         raise ValueError("cornerPointsPx enclose no area")
 
     # A perspective transform (homography) is the 3x3 matrix that maps any four points onto any
     # other four: here the photographed corners onto the corners of a flat, upright rectangle
-    targetHeightPx = max(1, round(targetWidthPx * pageHeightMm / pageWidthMm))
+    topLeft, topRight, bottomRight, bottomLeft = sourceCorners
+    widthPx = (np.linalg.norm(topRight - topLeft) + np.linalg.norm(bottomRight - bottomLeft)) / 2
+    heightPx = (np.linalg.norm(bottomLeft - topLeft) + np.linalg.norm(bottomRight - topRight)) / 2
+    targetHeightPx = max(1, round(targetWidthPx * heightPx / widthPx))
     targetCorners = np.array([[0, 0], [targetWidthPx - 1, 0],
                               [targetWidthPx - 1, targetHeightPx - 1], [0, targetHeightPx - 1]], dtype=np.float32)
     transform = cv2.getPerspectiveTransform(sourceCorners, targetCorners)
@@ -146,19 +162,11 @@ def _candidate_page_masks(grayscaleImage: np.ndarray):
     yield cv2.dilate(edges, np.ones((5, 5), np.uint8))
 
 
-def _looks_like_page(corners: np.ndarray, grayscaleImage: np.ndarray,
-                     pageWidthMm: float, pageHeightMm: float) -> bool:
+def _looks_like_page(corners: np.ndarray, grayscaleImage: np.ndarray) -> bool:
     """Size, shape and brightness checks that reject desks, books and blocks of text."""
     imageAreaPx = grayscaleImage.shape[0] * grayscaleImage.shape[1]
     areaFraction = cv2.contourArea(corners) / imageAreaPx
     if not PAGE_MIN_AREA_FRACTION <= areaFraction <= PAGE_MAX_AREA_FRACTION:
-        return False
-
-    # Shape: average opposite sides, compare height/width with the paper's (allows some perspective)
-    topLeft, topRight, bottomRight, bottomLeft = corners
-    widthPx = (np.linalg.norm(topRight - topLeft) + np.linalg.norm(bottomRight - bottomLeft)) / 2
-    heightPx = (np.linalg.norm(bottomLeft - topLeft) + np.linalg.norm(bottomRight - topRight)) / 2
-    if widthPx == 0 or abs((heightPx / widthPx) / (pageHeightMm / pageWidthMm) - 1) > PAGE_ASPECT_TOLERANCE:
         return False
 
     # Brightness: paper should be brighter than what surrounds it (a block of text is darker, not brighter)
@@ -168,8 +176,7 @@ def _looks_like_page(corners: np.ndarray, grayscaleImage: np.ndarray,
     return outside.size > 0 and float(np.median(inside)) - float(np.median(outside)) >= PAGE_MIN_BRIGHTNESS_GAIN
 
 
-def detect_page_corners(originalImage: np.ndarray, pageWidthMm: float,
-                        pageHeightMm: float) -> Optional[list[tuple[float, float]]]:
+def detect_page_corners(originalImage: np.ndarray) -> Optional[list[tuple[float, float]]]:
     """Find the page's four corners automatically (cornerPointsPx in originalImage pixels), or None.
 
     None means no convincing page was found, including when the page already fills the whole photo.
@@ -184,7 +191,7 @@ def detect_page_corners(originalImage: np.ndarray, pageWidthMm: float,
         for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:5]:    # biggest outlines first
             quad = _quad_from_contour(contour)
             corners = _order_corners(quad) if quad is not None else None
-            if corners is not None and _looks_like_page(corners, smallGrayscale, pageWidthMm, pageHeightMm):
+            if corners is not None and _looks_like_page(corners, smallGrayscale):
                 return [(float(x), float(y)) for x, y in corners / shrinkFactor]
     return None
 
@@ -298,8 +305,7 @@ def rotate_image(image: np.ndarray, angleDeg: float, borderMode: int = cv2.BORDE
                  borderValue: int = 0) -> np.ndarray:
     """Rotate counter-clockwise by angleDeg, enlarging the canvas so no corner is cut off.
 
-    Rotation does not change mm-per-pixel, but it does change the image size, so compute
-    scaleMmPerPxX/Y from the page size BEFORE rotating.
+    Rotation expands the image; retain the pre-rotation canvas dimensions for ratios.
     """
     heightPx, widthPx = image.shape[:2]
     center = (widthPx / 2, heightPx / 2)

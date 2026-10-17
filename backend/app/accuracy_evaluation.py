@@ -1,6 +1,7 @@
 """Preliminary OCR legibility score: how confidently EasyOCR can read the handwriting.
 
-Not yet part of POST /api/analyze; adding it needs a contract change (new featureId, schemaVersion 1.2).
+Not yet part of POST /api/analyze; returning OCR results needs a contract change.
+OCR confidence is separate from the app's overall legibilityScore.
 
 Run from the backend/ folder:
     python -m app.accuracy_evaluation [image path]     (default: data/image0(37).heic at the project root)
@@ -9,6 +10,7 @@ HEIC photos (iPhone) need:  pip install pillow-heif
 """
 import sys
 from pathlib import Path
+from typing import Any, NamedTuple, Optional
 
 import cv2
 import numpy as np
@@ -28,19 +30,26 @@ def load_reader():
     return easyocr.Reader(["en"], gpu=False)
 
 
-def measure_handwriting_legibility(gray_image, reader):
+class OcrResult(NamedTuple):
+    """OCR confidence is 0-1; ocrScore is the same confidence scaled to 0-100."""
+
+    recognizedText: str
+    ocrConfidence: Optional[float]
+    ocrScore: Optional[float]
+    detections: list[Any]
+
+
+def measure_handwriting_legibility(gray_image, reader) -> OcrResult:
     """
     Recognize text and calculate a preliminary OCR legibility score.
 
     Returns:
-        recognized_text: Text predicted by OCR.
-        mean_confidence: Character-count-weighted confidence, from 0 to 1.
-        legibility_score: Preliminary score, from 0 to 100.
-                         None means no usable text was detected.
-        results: Original OCR detections for inspection.
+        OcrResult with recognizedText, ocrConfidence (0-1), ocrScore (0-100),
+        and raw detections. Both numeric fields are None when no text is found.
+        Confidence does not measure accuracy against a known transcription.
     """
 
-    # Use the resized grayscale image from Step 3.
+    # Accept a prepared grayscale page (pageImage in the API).
     # It retains stroke detail that thresholding and noise removal may discard.
     # detail=1 preserves confidence values.
     # paragraph=False keeps individual text regions and their confidence values.
@@ -76,7 +85,7 @@ def measure_handwriting_legibility(gray_image, reader):
     # No detection does not prove the handwriting deserves a score of zero.
     # It could also indicate an unsuitable photo or OCR failure.
     if total_characters == 0:
-        return "", None, None, results
+        return OcrResult("", None, None, results)
 
     # Longer text regions contribute more than shorter regions.
     mean_confidence = weighted_confidence_sum / total_characters
@@ -89,7 +98,7 @@ def measure_handwriting_legibility(gray_image, reader):
     # Complex page layouts may need separate reading-order handling.
     recognized_text = "\n".join(text_parts)
 
-    return recognized_text, mean_confidence, legibility_score, results
+    return OcrResult(recognized_text, mean_confidence, legibility_score, results)
 
 
 def load_photo(path):
@@ -112,23 +121,17 @@ def main(path):
     gray = resize_to_width(to_grayscale(load_photo(path)))
     reader = load_reader()
 
-    # Store the score for later use in your overall handwriting rating.
-    (
-        recognized_text,
-        ocr_confidence,
-        handwriting_accuracy_score,
-        ocr_results
-    ) = measure_handwriting_legibility(gray, reader)
+    result = measure_handwriting_legibility(gray, reader)
 
     print("\nOCR-predicted text:")
-    print(recognized_text if recognized_text else "[No text detected]")
+    print(result.recognizedText if result.recognizedText else "[No text detected]")
 
-    if handwriting_accuracy_score is None:
-        print("Handwriting accuracy score: unavailable — no text detected.")
+    if result.ocrScore is None:
+        print("OCR confidence score: unavailable - no text detected.")
     else:
-        print(f"Weighted OCR confidence: {ocr_confidence:.3f}")
-        print(f"Handwriting accuracy score: {handwriting_accuracy_score:.1f}/100")
-    return handwriting_accuracy_score
+        print(f"Weighted OCR confidence: {result.ocrConfidence:.3f}")
+        print(f"OCR confidence score: {result.ocrScore:.1f}/100")
+    return result.ocrScore
 
 
 if __name__ == "__main__":

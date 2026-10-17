@@ -2,7 +2,7 @@
 // Must match backend/app/schemas.py field-for-field; see shared/analysis-contract.md.
 // null means "could not be estimated"; 0 is a real measurement.
 
-export const SCHEMA_VERSION = "1.1";
+export const SCHEMA_VERSION = "2.0";
 
 export type FeatureId =
   | "textSize"
@@ -46,8 +46,8 @@ export type PointPx = [number, number];
 /** Form fields of POST /api/analyze (multipart/form-data). */
 export interface AnalyzeRequest {
   imageFile: File;
-  pageWidthMm: number;
-  pageHeightMm: number;
+  pageWidthMm?: number;
+  pageHeightMm?: number;
   /** Page corners: top-left, top-right, bottom-right, bottom-left. Sent as a JSON string. */
   cornerPointsPx?: [PointPx, PointPx, PointPx, PointPx];
 }
@@ -67,14 +67,14 @@ export interface QualityCheck {
 
 /** The ten raw measurements. */
 export interface FeatureMeasurements {
-  textSizeMm: number | null;
-  xHeightMm: number | null;
-  baselineVariationMm: number | null;
+  textHeightCanvasRatio: number | null;
+  xHeightTextRatio: number | null;
+  baselineVariationRatio: number | null;
   aspectRatioCv: number | null;
   solidityCv: number | null;
   slantStdDeg: number | null;
   strokeContrastRatio: number | null;
-  strokeWidthMedianMm: number | null;
+  strokeWidthRatio: number | null;
   relativeLetterSpacing: number | null;
   letterSpacingCv: number | null;
 }
@@ -135,7 +135,7 @@ export interface AdviceItem {
 // ---------- full response ----------
 
 export interface AnalysisResponse {
-  schemaVersion: "1.1";
+  schemaVersion: "2.0";
   status: AnalysisStatus;
   error: AnalysisError | null;
   /** Final 0-100 score, or null. */

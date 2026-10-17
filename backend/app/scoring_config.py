@@ -22,12 +22,12 @@ FEATURE_IDS = ("textSize", "xHeight", "baselineConsistency", "shapeConsistency",
 
 # featureId -> source measurement(s); a feature with several sources is the mean of their available scores
 FEATURE_SOURCES = {
-    "textSize":            ("textSizeMm",),
-    "xHeight":             ("xHeightMm",),
-    "baselineConsistency": ("baselineVariationMm",),
+    "textSize":            ("textHeightCanvasRatio",),
+    "xHeight":             ("xHeightTextRatio",),
+    "baselineConsistency": ("baselineVariationRatio",),
     "shapeConsistency":    ("aspectRatioCv", "solidityCv", "slantStdDeg"),
     "strokeContrast":      ("strokeContrastRatio",),
-    "strokeWeight":        ("strokeWidthMedianMm",),
+    "strokeWeight":        ("strokeWidthRatio",),
     "letterSpacing":       ("relativeLetterSpacing",),
     "spacingConsistency":  ("letterSpacingCv",),
 }
@@ -38,13 +38,13 @@ FEATURE_WEIGHTS = {featureId: 0.125 for featureId in FEATURE_IDS}   # replaced b
 # After regression: FEATURE_WEIGHTS = {"textSize": 0.09, "xHeight": 0.21, ...}
 
 SWEET_SPOT_CURVES = {          # (a, b, c, d); placeholder values, not yet calibrated
-    "textSizeMm":            (1.5, 3.0, 7.0, 12.0),
-    "xHeightMm":             (1.0, 2.0, 4.5, 8.0),
-    "strokeWidthMedianMm":   (0.1, 0.3, 0.8, 1.5),
+    "textHeightCanvasRatio":            (0.005, 0.010, 0.025, 0.050),
+    "xHeightTextRatio":             (0.30, 0.50, 0.85, 1.10),
+    "strokeWidthRatio":   (0.02, 0.06, 0.18, 0.35),
     "relativeLetterSpacing": (0.0, 0.15, 0.6, 1.2),
 }
 DECREASING_CURVES = {          # (perfect value v0, zero-score value v1)
-    "baselineVariationMm": (0.3, 2.5),
+    "baselineVariationRatio": (0.10, 0.80),
     "aspectRatioCv":       (0.1, 0.8),
     "solidityCv":          (0.05, 0.5),
     "slantStdDeg":         (2.0, 20.0),
@@ -68,7 +68,7 @@ ISSUE_GAP_DEVIATION_RATIO = 0.25   # letter gap differing from the median gap by
 # A gap outside the relativeLetterSpacing ideal range (sweet-spot b..c) is marked letterSpacing
 
 # Upload and photo checks (backend/app/main.py)
-ALLOWED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
+ALLOWED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence")  # MIME types accepted by the browser
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024   # 15 MB; phone photos are usually 2-6 MB
 MIN_IMAGE_SIDE_PX = 600         # shorter side of the uploaded photo must be at least this
 MIN_INK_FRACTION = 0.0005       # less than this fraction of ink pixels -> NOT_ENOUGH_WRITING
@@ -83,7 +83,6 @@ RECTIFIED_JPEG_QUALITY = 85     # quality of the rectifiedImage data URL sent ba
 PAGE_DETECT_MAX_SIDE_PX = 800   # photo is shrunk to this long side for detection (speed); corners are scaled back
 PAGE_MIN_AREA_FRACTION = 0.2    # the page must cover at least this fraction of the photo
 PAGE_MAX_AREA_FRACTION = 0.97   # a "page" this big is just the photo's own border: the page fills the frame
-PAGE_ASPECT_TOLERANCE = 0.35    # detected height/width may differ from the paper's by this fraction (perspective)
 PAGE_MIN_BRIGHTNESS_GAIN = 15   # page must be this much brighter (0-255) than its surroundings
 
 # Image pipeline (backend/app/image_pipeline.py)
@@ -113,3 +112,6 @@ MIN_GAPS_FOR_STATS = 4          # fewer within-word letter gaps than this -> spa
 MIN_LETTERS_FOR_BASELINE = 3    # a line needs this many letters to fit its baseline
 X_HEIGHT_ROW_FRACTION = 0.5     # rows with >= this fraction of a line's peak ink form the x-height band
 WORD_GAP_MIN_RATIO = 2.5        # gap wider than this x the line's median gap -> word gap, not letter gap
+# Broad warning defaults for ordinary handwriting; never used in scoring.
+MIN_TEXT_HEIGHT_MM = 2.0
+MAX_TEXT_HEIGHT_MM = 10.0

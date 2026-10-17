@@ -25,8 +25,7 @@ from .schemas import SCHEMA_VERSION, AnalysisResponse, AnalyzeRequestFields
 from .scoring import score_measurements
 from .scoring_config import (ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, MIN_IMAGE_SIDE_PX, MIN_INK_FRACTION,
                              MIN_INK_CONTRAST, MIN_EDGE_SHARPNESS, MIN_LETTERS_FOR_ANALYSIS,
-                             RECTIFIED_JPEG_QUALITY)
-
+                             RECTIFIED_JPEG_QUALITY, MIN_TEXT_HEIGHT_MM, MAX_TEXT_HEIGHT_MM)
 
 # ---------- 1. App setup ----------
 
@@ -87,7 +86,7 @@ def to_jpeg_data_url(image: np.ndarray) -> str:
 
 # ---------- 3. Request parsing ----------
 
-def parse_request_fields(pageWidthMm: float, pageHeightMm: float,
+def parse_request_fields(pageWidthMm: Optional[float], pageHeightMm: Optional[float],
                          cornerPointsPx: Optional[str]) -> AnalyzeRequestFields:
     """Validate the form fields. Bad fields are a bug in the caller, so they get HTTP 422, not needs_better_photo."""
     try:
@@ -126,24 +125,18 @@ async def read_and_check_upload(imageFile: UploadFile, qualityChecks: list[dict]
     return originalImage
 
 
-# ---------- 5. Page geometry: straighten the page and work out mm per pixel ----------
+# ---------- 5. Page geometry: straighten the page independently of physical dimensions ----------
 
 def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
                  qualityChecks: list[dict], warnings: list[str]):
-    """Return (deskewed grayscale page, scaleMmPerPxX, scaleMmPerPxY).
-
-    Corners come from the user (cornerPointsPx) or, if none were sent, from automatic detection.
-    With corners: perspective-correct the page, so the scale is exact.
-    No corners found: assume the photo shows exactly the page (approximate; adds a warning).
-    The scale is computed BEFORE deskew, because rotating enlarges the canvas but keeps mm per pixel.
-    """
+    """Return deskewed page, pre-deskew height/width, and whether page bounds were found."""
     cornerPointsPx = fields.cornerPointsPx
     if cornerPointsPx is None:
-        cornerPointsPx = detect_page_corners(originalImage, fields.pageWidthMm, fields.pageHeightMm)
+        cornerPointsPx = detect_page_corners(originalImage)
 
     if cornerPointsPx is not None:
         try:
-            pageImage = rectify_page(originalImage, cornerPointsPx, fields.pageWidthMm, fields.pageHeightMm)
+            pageImage = rectify_page(originalImage, cornerPointsPx)
         except ValueError:
             raise PhotoProblem("PAGE_NOT_FOUND", "pageBounds",
                                "The page corners don't fit the photo. Adjust the corners and try again.")
@@ -152,15 +145,35 @@ def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
     else:
         grayscaleImage = resize_to_width(to_grayscale(originalImage))
         warnings.append("The page edges weren't found, so the whole photo was treated as the page. "
-                        "Sizes in mm may be inaccurate; adjust the corners for an exact result.")
+                        "Canvas ratios may be inaccurate; adjust the corners. Physical size warnings were skipped.")
 
     pageHeightPx, pageWidthPx = grayscaleImage.shape
-    scaleMmPerPxX = fields.pageWidthMm / pageWidthPx
-    scaleMmPerPxY = fields.pageHeightMm / pageHeightPx
 
     # Correct uneven lighting before deskew, so shadows don't affect the angle search or the thresholds
     deskewedImage, _ = deskew(normalize_illumination(grayscaleImage))
-    return deskewedImage, scaleMmPerPxX, scaleMmPerPxY
+    return deskewedImage, pageHeightPx, pageWidthPx, cornerPointsPx is not None
+
+
+def append_text_size_warning(measurements: dict, fields: AnalyzeRequestFields,
+                             canvasHeightPx: int, canvasWidthPx: int,
+                             boundsKnown: bool, warnings: list[str]) -> None:
+    """Optional approximate physical-size warnings, independent of feature scoring."""
+    ratio = measurements["textHeightCanvasRatio"]
+    if not boundsKnown or ratio is None:
+        return
+    # Prefer vertical calibration; width alone assumes square rectified pixels.
+    heightMm = fields.pageHeightMm
+    if heightMm is None and fields.pageWidthMm is not None:
+        heightMm = fields.pageWidthMm * canvasHeightPx / canvasWidthPx
+    if heightMm is None:
+        return
+    textHeightMm = ratio * heightMm
+    if textHeightMm < MIN_TEXT_HEIGHT_MM:
+        warnings.append(f"Your letters are approximately {textHeightMm:.1f} mm tall. "
+                        f"Below {MIN_TEXT_HEIGHT_MM:g} mm, ordinary handwriting may be difficult to read.")
+    elif textHeightMm > MAX_TEXT_HEIGHT_MM:
+        warnings.append(f"Your letters are approximately {textHeightMm:.1f} mm tall. "
+                        f"Above {MAX_TEXT_HEIGHT_MM:g} mm is unusually large for ordinary handwriting.")
 
 
 # ---------- 6. Ink, contrast, blur and segmentation checks ----------
@@ -239,7 +252,6 @@ def build_overlay_data(inkMask: np.ndarray, textLines, featureScores: dict) -> d
     return {"coordinateSpace": "rectifiedImagePx", "imageWidthPx": imageWidthPx, "imageHeightPx": imageHeightPx,
             "lines": lines, "components": components, "gaps": gaps}
 
-
 # ---------- 8. Endpoints ----------
 
 @app.get("/api/health")
@@ -251,8 +263,8 @@ def health() -> dict:
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze(
     imageFile: UploadFile = File(...),
-    pageWidthMm: float = Form(...),
-    pageHeightMm: float = Form(...),
+    pageWidthMm: Optional[float] = Form(None),
+    pageHeightMm: Optional[float] = Form(None),
     cornerPointsPx: Optional[str] = Form(None),
 ) -> dict:
     """Photo in, legibility estimate out. Every step either passes a quality check or stops with a retry message.
@@ -267,12 +279,13 @@ async def analyze(
 
     try:
         originalImage = await read_and_check_upload(imageFile, qualityChecks)
-        pageImage, scaleMmPerPxX, scaleMmPerPxY = prepare_page(originalImage, fields, qualityChecks, warnings)
+        pageImage, canvasHeightPx, canvasWidthPx, boundsKnown = prepare_page(originalImage, fields, qualityChecks, warnings)
         inkMask, textLines = segment_writing(pageImage, qualityChecks)
     except PhotoProblem as problem:
         return needs_better_photo_response(problem, qualityChecks)
 
-    featureMeasurements = compute_feature_measurements(inkMask, textLines, scaleMmPerPxX, scaleMmPerPxY)
+    featureMeasurements = compute_feature_measurements(inkMask, textLines, canvasHeightPx)
+    append_text_size_warning(featureMeasurements, fields, canvasHeightPx, canvasWidthPx, boundsKnown, warnings)
     scoring = score_measurements(featureMeasurements)
     if scoring["missingFeatureIds"]:
         warnings.append("Some features could not be measured and were left out of the score: "
@@ -282,7 +295,7 @@ async def analyze(
         "schemaVersion": SCHEMA_VERSION,
         "status": "complete",
         "error": None,
-        **scoring,    # legibilityScore, scoreLabel, featureScores, featureWeights, missingFeatureIds
+        **scoring,
         "rectifiedImage": to_jpeg_data_url(pageImage),
         "featureMeasurements": featureMeasurements,
         "warnings": warnings,

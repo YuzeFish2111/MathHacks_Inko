@@ -34,7 +34,6 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `deskewAngleDeg` | Applied rotation angle in degrees |
 | `pageWidthMm`, `pageHeightMm` | User-provided physical paper dimensions |
 | `pageWidthPx`, `pageHeightPx` | Rectified page dimensions in pixels |
-| `scaleMmPerPxX`, `scaleMmPerPxY` | mm per pixel: pageWidthMm / pageWidthPx, etc. |
 | `textLines` | Detected writing lines, ordered top-to-bottom |
 | `letterComponents` | Candidate connected components; not guaranteed letters |
 | `wordGaps` | Gaps classified as between words |
@@ -45,14 +44,14 @@ field-for-field. Example responses: `shared/fixtures/`.
 
 | Name | Meaning |
 |---|---|
-| `textSizeMm` | Median candidate component height, mm |
-| `xHeightMm` | Estimated lowercase-body height, mm |
-| `baselineVariationMm` | Std. deviation from fitted baseline, mm |
+| `textHeightCanvasRatio` | Median letter height / pre-deskew canvas height |
+| `xHeightTextRatio` | Estimated lowercase-body height / median letter height |
+| `baselineVariationRatio` | Robust baseline variation / lowercase-body height |
 | `aspectRatioCv` | CV of component width/height |
 | `solidityCv` | CV of component solidity |
 | `slantStdDeg` | Std. deviation of estimated slant, degrees |
 | `strokeContrastRatio` | 90th / 10th percentile stroke width |
-| `strokeWidthMedianMm` | Median stroke width, mm |
+| `strokeWidthRatio` | Median stroke width / lowercase-body height |
 | `relativeLetterSpacing` | Median within-word letter gap / x-height; unitless |
 | `letterSpacingCv` | CV of within-word letter gaps |
 | `featureMeasurements` | Object containing the raw measurements above |
@@ -67,12 +66,12 @@ field-for-field. Example responses: `shared/fixtures/`.
 
 | featureId | Source measurement | Curve |
 |---|---|---|
-| `textSize` | `textSizeMm` | sweet-spot |
-| `xHeight` | `xHeightMm` | sweet-spot |
-| `baselineConsistency` | `baselineVariationMm` | decreasing |
+| `textSize` | `textHeightCanvasRatio` | sweet-spot |
+| `xHeight` | `xHeightTextRatio` | sweet-spot |
+| `baselineConsistency` | `baselineVariationRatio` | decreasing |
 | `shapeConsistency` | mean of `aspectRatioCv`, `solidityCv`, `slantStdDeg` | decreasing |
 | `strokeContrast` | `strokeContrastRatio` | decreasing |
-| `strokeWeight` | `strokeWidthMedianMm` | sweet-spot |
+| `strokeWeight` | `strokeWidthRatio` | sweet-spot |
 | `letterSpacing` | `relativeLetterSpacing` | sweet-spot |
 | `spacingConsistency` | `letterSpacingCv` | decreasing |
 
@@ -93,12 +92,12 @@ field-for-field. Example responses: `shared/fixtures/`.
 | Field | Required | Type |
 |---|---|---|
 | `imageFile` | required | image file |
-| `pageWidthMm` | required | number |
-| `pageHeightMm` | required | number |
+| `pageWidthMm` | optional | positive finite number; warning-only |
+| `pageHeightMm` | optional | positive finite number; warning-only |
 | `cornerPointsPx` | optional | JSON string `[[x,y],[x,y],[x,y],[x,y]]` in originalImage pixels, order top-left, top-right, bottom-right, bottom-left |
 
 ### Response
-
+- `schemaVersion`: `"2.0"`.
 - `status`: `"complete"` or `"needs_better_photo"`.
 - `error`: `null`, or `{ "code": string, "message": string }`.
 - `qualityChecks` item: `{ "checkId": string, "passed": boolean, "message": string | null }`.
@@ -122,3 +121,13 @@ Full examples (illustrative values only, not calibrated):
 
 - `shared/fixtures/complete-response.json`
 - `shared/fixtures/needs-better-photo-response.json`
+
+## Ratio geometry and physical warnings (2.0)
+
+Physical page dimensions never affect detection, rectification, measurements, or scores.
+Canvas ratios use dimensions before deskew expands the image. Keep the full canvas in frame.
+Rectification estimates proportions from corner edge lengths; strong perspective remains approximate.
+With known page bounds and either physical dimension, median letter heights below 2 mm or above
+10 mm trigger a warning only. Height calibration is preferred; width-only calibration assumes
+square rectified pixels. Missing bounds or dimensions skip physical warnings. Thresholds and ratio
+scoring curves are initial product heuristics requiring validation against handwriting samples.

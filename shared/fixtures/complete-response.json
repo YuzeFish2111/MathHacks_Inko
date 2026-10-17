@@ -1,19 +1,19 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "2.0",
   "status": "complete",
   "error": null,
   "legibilityScore": 78,
   "scoreLabel": "Readable",
   "rectifiedImage": "data:image/jpeg;base64,...",
   "featureMeasurements": {
-    "textSizeMm": 6.2,
-    "xHeightMm": 3.1,
-    "baselineVariationMm": 0.8,
+    "textHeightCanvasRatio": 0.020875420875420877,
+    "xHeightTextRatio": 0.5,
+    "baselineVariationRatio": 0.25806451612903225,
     "aspectRatioCv": 0.24,
     "solidityCv": 0.19,
     "slantStdDeg": 5.4,
     "strokeContrastRatio": 1.8,
-    "strokeWidthMedianMm": 0.42,
+    "strokeWidthRatio": 0.13548387096774192,
     "relativeLetterSpacing": 0.31,
     "letterSpacingCv": 0.38
   },
@@ -40,25 +40,50 @@
   "missingFeatureIds": [],
   "warnings": [],
   "qualityChecks": [
-    { "checkId": "blur", "passed": true, "message": null }
+    {
+      "checkId": "blur",
+      "passed": true,
+      "message": null
+    }
   ],
   "overlayData": {
     "coordinateSpace": "rectifiedImagePx",
     "imageWidthPx": 1200,
     "imageHeightPx": 1600,
     "lines": [
-      { "lineId": "line-1", "kind": "baseline",
-        "x1Px": 100, "y1Px": 430, "x2Px": 1080, "y2Px": 438 }
+      {
+        "lineId": "line-1",
+        "kind": "baseline",
+        "x1Px": 100,
+        "y1Px": 430,
+        "x2Px": 1080,
+        "y2Px": 438
+      }
     ],
     "components": [
-      { "componentId": "component-1", "lineId": "line-1",
-        "xPx": 120, "yPx": 390, "widthPx": 28, "heightPx": 40,
-        "issueFeatureIds": [] }
+      {
+        "componentId": "component-1",
+        "lineId": "line-1",
+        "xPx": 120,
+        "yPx": 390,
+        "widthPx": 28,
+        "heightPx": 40,
+        "issueFeatureIds": []
+      }
     ],
     "gaps": [
-      { "gapId": "gap-1", "lineId": "line-1", "kind": "letter",
-        "xPx": 148, "yPx": 410, "widthPx": 12, "heightPx": 4,
-        "issueFeatureIds": ["letterSpacing"] }
+      {
+        "gapId": "gap-1",
+        "lineId": "line-1",
+        "kind": "letter",
+        "xPx": 148,
+        "yPx": 410,
+        "widthPx": 12,
+        "heightPx": 4,
+        "issueFeatureIds": [
+          "letterSpacing"
+        ]
+      }
     ]
   },
   "advice": [

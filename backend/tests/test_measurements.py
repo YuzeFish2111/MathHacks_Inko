@@ -4,9 +4,6 @@ import numpy as np
 from app.image_pipeline import find_text_lines, find_components
 from app.measurements import compute_feature_measurements, measure_stroke_widths_px, measure_slant_std_deg
 
-SCALE_MM_PER_PX = 0.1    # so 40 px = 4.0 mm
-
-
 def draw_letter_line(baselineOffsetsPx=(0,) * 8, strokePx=5):
     """One line of 8 identical hollow 'letters' (20 x 40 px), 10 px apart, then a word gap of 50 px
     and 4 more letters. baselineOffsetsPx shifts letters up/down to make an uneven baseline."""
@@ -24,23 +21,23 @@ def draw_letter_line(baselineOffsetsPx=(0,) * 8, strokePx=5):
     return inkMask
 
 
-def measure(inkMask, scaleMmPerPx=SCALE_MM_PER_PX):
+def measure(inkMask, canvasHeightPx=None):
     textLines = find_components(inkMask, find_text_lines(inkMask))
-    return compute_feature_measurements(inkMask, textLines, scaleMmPerPx, scaleMmPerPx)
+    return compute_feature_measurements(inkMask, textLines, canvasHeightPx or inkMask.shape[0])
 
 
 def test_returns_all_ten_canonical_keys():
     assert list(measure(draw_letter_line())) == [
-        "textSizeMm", "xHeightMm", "baselineVariationMm", "aspectRatioCv", "solidityCv",
-        "slantStdDeg", "strokeContrastRatio", "strokeWidthMedianMm", "relativeLetterSpacing",
+        "textHeightCanvasRatio", "xHeightTextRatio", "baselineVariationRatio", "aspectRatioCv", "solidityCv",
+        "slantStdDeg", "strokeContrastRatio", "strokeWidthRatio", "relativeLetterSpacing",
         "letterSpacingCv"]
 
 
 def test_identical_letters_measure_as_perfectly_consistent():
     m = measure(draw_letter_line())
-    assert abs(m["textSizeMm"] - 4.0) < 1e-9                 # 40 px x 0.1 mm/px
-    assert abs(m["xHeightMm"] - 4.0) < 1e-9
-    assert m["baselineVariationMm"] == 0
+    assert abs(m["textHeightCanvasRatio"] - 0.2) < 1e-9                 # 40 px / 200 px canvas height
+    assert abs(m["xHeightTextRatio"] - 1.0) < 1e-9
+    assert m["baselineVariationRatio"] == 0
     assert abs(m["aspectRatioCv"]) < 1e-9
     assert abs(m["solidityCv"]) < 1e-9
     assert abs(m["slantStdDeg"]) < 1e-9
@@ -49,13 +46,14 @@ def test_identical_letters_measure_as_perfectly_consistent():
 
 
 def test_uneven_baseline_is_detected():
-    assert measure(draw_letter_line(baselineOffsetsPx=(0, 6, -6, 3)))["baselineVariationMm"] > 0.3
+    assert measure(draw_letter_line(baselineOffsetsPx=(0, 6, -6, 3)))["baselineVariationRatio"] > 0.075
 
 
 def test_stroke_width_matches_drawn_pen_width():
     for strokePx in (3, 5, 7):
         m = measure(draw_letter_line(strokePx=strokePx))
-        assert abs(m["strokeWidthMedianMm"] - strokePx * SCALE_MM_PER_PX) <= 0.1   # within 1 px
+        xHeightPx = m["xHeightTextRatio"] * 40
+        assert abs(m["strokeWidthRatio"] - strokePx / xHeightPx) <= 1 / xHeightPx   # within 1 px
 
 
 def test_stroke_contrast_sees_thick_and_thin_strokes():
@@ -75,10 +73,12 @@ def test_slant_varies_when_letters_lean_differently():
     assert measure_slant_std_deg(textLines) > 5
 
 
-def test_unknown_scale_gives_null_mm_values_but_keeps_the_rest():
-    m = measure(draw_letter_line(), scaleMmPerPx=None)
-    assert m["textSizeMm"] is None and m["xHeightMm"] is None and m["strokeWidthMedianMm"] is None
-    assert m["aspectRatioCv"] is not None and m["relativeLetterSpacing"] is not None
+def test_canvas_height_changes_only_canvas_ratio():
+    mask = draw_letter_line()
+    original = measure(mask)
+    taller = measure(mask, canvasHeightPx=400)
+    assert taller.pop("textHeightCanvasRatio") == original.pop("textHeightCanvasRatio") / 2
+    assert taller == original
 
 
 def test_too_little_writing_gives_null_not_zero():
@@ -86,7 +86,7 @@ def test_too_little_writing_gives_null_not_zero():
     inkMask[80:120, 50:70] = 255                              # a single letter
     inkMask[85:115, 55:65] = 0
     m = measure(inkMask)
-    assert m["textSizeMm"] is None
+    assert m["textHeightCanvasRatio"] is None
     assert m["aspectRatioCv"] is None
     assert m["letterSpacingCv"] is None
 

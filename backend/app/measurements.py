@@ -1,6 +1,6 @@
 """The ten featureMeasurements.
 
-Everything is measured in rectifiedImage pixels and converted to mm only at the end.
+Measurements use pixel ratios and degrees; physical dimensions are warning-only.
 Any measurement that cannot be estimated reliably is None (null), never 0.
 Only components of kind "letter" are used for shape and size; "mark" (dots, punctuation)
 and "cluster" (joined letters) would distort them.
@@ -41,12 +41,14 @@ def _cv(values: list[float], minCount: int = MIN_COMPONENTS_FOR_STATS) -> Option
     return None if mean == 0 else float(np.std(values) / mean)
 
 
-def _to_mm(valuePx: Optional[float], scaleMmPerPx: Optional[float]) -> Optional[float]:
-    """Convert pixels to mm; None if either the value or the scale is unknown."""
-    if valuePx is None or scaleMmPerPx is None:
+def _ratio(
+    numerator: Optional[float],
+    denominator: Optional[float],
+) -> Optional[float]:
+    """Divide two measurements; None if either is missing or the denominator is invalid."""
+    if numerator is None or denominator is None or denominator <= 0:
         return None
-    return valuePx * scaleMmPerPx
-
+    return float(numerator / denominator)
 
 # ---------- 1. size ----------
 
@@ -235,26 +237,25 @@ def measure_letter_spacing_cv(letterGapsPx: list[float]) -> Optional[float]:
 # ---------- all ten ----------
 
 def compute_feature_measurements(inkMask: np.ndarray, textLines: list[TextLine],
-                                 scaleMmPerPxX: Optional[float],
-                                 scaleMmPerPxY: Optional[float]) -> dict[str, Optional[float]]:
+                                 canvasHeightPx: int) -> dict[str, Optional[float]]:
     """Return featureMeasurements with all ten canonical keys.
 
-    mm values are None when the scale is unknown; unitless values and degrees are still measured.
+    canvasHeightPx is the page height before deskew expands the image.
     """
     xHeightPx = measure_x_height_px(inkMask, textLines)
     strokeWidthsPx = measure_stroke_widths_px(inkMask)
     letterGapsPx = find_letter_gaps_px(textLines)
-    scaleMmPerPxMean = (scaleMmPerPxX + scaleMmPerPxY) / 2 if scaleMmPerPxX and scaleMmPerPxY else None
+    textHeightPx = measure_text_size_px(textLines)
 
     return {
-        "textSizeMm":            _to_mm(measure_text_size_px(textLines), scaleMmPerPxY),
-        "xHeightMm":             _to_mm(xHeightPx, scaleMmPerPxY),
-        "baselineVariationMm":   _to_mm(measure_baseline_variation_px(textLines), scaleMmPerPxY),
+        "textHeightCanvasRatio":            _ratio(textHeightPx, canvasHeightPx),
+        "xHeightTextRatio":             _ratio(xHeightPx, textHeightPx),
+        "baselineVariationRatio":   _ratio(measure_baseline_variation_px(textLines), xHeightPx),
         "aspectRatioCv":         measure_aspect_ratio_cv(textLines),
         "solidityCv":            measure_solidity_cv(textLines),
         "slantStdDeg":           measure_slant_std_deg(textLines),
         "strokeContrastRatio":   measure_stroke_contrast_ratio(strokeWidthsPx),
-        "strokeWidthMedianMm":   _to_mm(measure_stroke_width_median_px(strokeWidthsPx), scaleMmPerPxMean),
+        "strokeWidthRatio":   _ratio(measure_stroke_width_median_px(strokeWidthsPx), xHeightPx),
         "relativeLetterSpacing": measure_relative_letter_spacing(letterGapsPx, xHeightPx),
         "letterSpacingCv":       measure_letter_spacing_cv(letterGapsPx),
     }

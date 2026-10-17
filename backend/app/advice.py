@@ -13,31 +13,31 @@ from .scoring_config import (FEATURE_IDS, FEATURE_SOURCES, SWEET_SPOT_CURVES,
 
 # Placeholders: {value} is the measured value, {idealLow}/{idealHigh} the ideal range (sweet-spot curves only).
 ADVICE_TEMPLATES = {
-    ("textSizeMm", "low"): {
+    ("textHeightCanvasRatio", "low"): {
         "title": "Write a little bigger",
-        "message": "Your letters are about {value} mm tall; the ideal range is {idealLow}-{idealHigh} mm.",
+        "message": "Your letters are about {value}% of the canvas height; the target range is {idealLow}-{idealHigh}%.",
         "exercise": "Copy the sentence again, letting each letter fill more of the space between the lines.",
     },
-    ("textSizeMm", "high"): {
+    ("textHeightCanvasRatio", "high"): {
         "title": "Write a little smaller",
-        "message": "Your letters are about {value} mm tall; the ideal range is {idealLow}-{idealHigh} mm.",
+        "message": "Your letters are about {value}% of the canvas height; the target range is {idealLow}-{idealHigh}%.",
         "exercise": "Copy the sentence again, keeping each letter inside the space between two lines.",
     },
-    ("xHeightMm", "low"): {
+    ("xHeightTextRatio", "low"): {
         "title": "Make small letters taller",
-        "message": "The bodies of your lowercase letters (a, e, o) are about {value} mm tall; "
-                   "the ideal range is {idealLow}-{idealHigh} mm.",
+        "message": "The bodies of your lowercase letters (a, e, o) are about {value}% of typical letter height; "
+                   "the target range is {idealLow}-{idealHigh}%.",
         "exercise": "Practise rows of a, e, o and n, making them reach halfway up the line.",
     },
-    ("xHeightMm", "high"): {
+    ("xHeightTextRatio", "high"): {
         "title": "Make small letters shorter",
-        "message": "The bodies of your lowercase letters (a, e, o) are about {value} mm tall; "
-                   "the ideal range is {idealLow}-{idealHigh} mm.",
+        "message": "The bodies of your lowercase letters (a, e, o) are about {value}% of typical letter height; "
+                   "the target range is {idealLow}-{idealHigh}%.",
         "exercise": "Practise rows of a, e, o and n, keeping them to half the line height so tall letters stand out.",
     },
-    ("baselineVariationMm", "high"): {
+    ("baselineVariationRatio", "high"): {
         "title": "Keep letters on the line",
-        "message": "Your letters drift up and down by about {value} mm from a straight baseline.",
+        "message": "Your letters drift up and down by about {value}% of lowercase body height from a straight baseline.",
         "exercise": "Write on lined paper and make the bottom of every letter touch the line.",
     },
     ("aspectRatioCv", "high"): {
@@ -60,14 +60,14 @@ ADVICE_TEMPLATES = {
         "message": "Your thickest strokes are {value} times as wide as your thinnest.",
         "exercise": "Write slowly with steady, light pressure, keeping the pen at the same angle.",
     },
-    ("strokeWidthMedianMm", "low"): {
+    ("strokeWidthRatio", "low"): {
         "title": "Use a darker or thicker pen",
-        "message": "Your strokes are about {value} mm wide; the ideal range is {idealLow}-{idealHigh} mm.",
+        "message": "Your stroke width is about {value}% of lowercase body height; the target range is {idealLow}-{idealHigh}%.",
         "exercise": "Try a medium ballpoint or gel pen, or press slightly harder.",
     },
-    ("strokeWidthMedianMm", "high"): {
+    ("strokeWidthRatio", "high"): {
         "title": "Use a finer pen",
-        "message": "Your strokes are about {value} mm wide; the ideal range is {idealLow}-{idealHigh} mm.",
+        "message": "Your stroke width is about {value}% of lowercase body height; the target range is {idealLow}-{idealHigh}%.",
         "exercise": "Try a fine-tip pen or sharpened pencil so letters with holes (a, e, o) stay open.",
     },
     ("relativeLetterSpacing", "low"): {
@@ -91,9 +91,9 @@ ADVICE_TEMPLATES = {
 
 # How each measurement's value is shown in a message: (multiplier, decimal places)
 DISPLAY_FORMATS = {
-    "textSizeMm": (1, 1), "xHeightMm": (1, 1), "baselineVariationMm": (1, 1),
+    "textHeightCanvasRatio": (100, 1), "xHeightTextRatio": (100, 1), "baselineVariationRatio": (100, 1),
     "aspectRatioCv": (100, 0), "solidityCv": (100, 0), "slantStdDeg": (1, 0),
-    "strokeContrastRatio": (1, 1), "strokeWidthMedianMm": (1, 2),
+    "strokeContrastRatio": (1, 1), "strokeWidthRatio": (100, 1),
     "relativeLetterSpacing": (100, 0), "letterSpacingCv": (100, 0),
 }
 
