@@ -3,7 +3,8 @@ import numpy as np
 
 from app.image_pipeline import (find_text_lines, find_components, rotate_image, deskew,
                                 threshold_ink, remove_small_components,
-                                measure_ink_contrast, measure_edge_sharpness, detect_page_corners)
+                                measure_ink_contrast, measure_edge_sharpness, detect_page_corners,
+                                estimate_background, normalize_illumination)
 from app.scoring_config import DESKEW_STEP_DEG
 
 
@@ -164,3 +165,50 @@ def test_no_page_found_when_it_fills_the_frame_or_is_missing():
 def test_page_with_the_wrong_shape_is_rejected():
     # A portrait page, but the user said landscape (297 x 210): don't stretch it to fit
     assert detect_page_corners(photo_of_page_on_desk(90, KEYSTONED_CORNERS), 297, 210) is None
+
+
+def lit_page(lighting):
+    """The text page (paper 245) multiplied by a lighting pattern of the same shape (1 = full light)."""
+    page = np.where(make_text_page() < 128, 0, 245).astype(np.float32)
+    return np.clip(page * lighting, 0, 255).astype(np.uint8)
+
+
+def ink_mask_match(image, reference):
+    """Overlap (intersection over union) between the ink masks of two images."""
+    a = remove_small_components(threshold_ink(image)) > 0
+    b = remove_small_components(threshold_ink(reference)) > 0
+    return (a & b).sum() / (a | b).sum()
+
+
+def lighting_patterns():
+    heightPx, widthPx = make_text_page().shape
+    _, columnPx = np.mgrid[0:heightPx, 0:widthPx]
+    return {"gradient": 1 - 0.65 * columnPx / widthPx,               # light fading across the page
+            "hard shadow": np.where(columnPx > widthPx * 0.55, 0.45, 1.0)}   # e.g. a phone's shadow
+
+
+def test_background_estimate_ignores_the_ink():
+    evenPage = lit_page(1.0)
+    backgroundEstimate = estimate_background(evenPage)
+    assert backgroundEstimate.min() >= 240                          # ink removed: paper level everywhere
+
+
+def test_normalized_paper_is_white_under_any_lighting():
+    for name, lighting in lighting_patterns().items():
+        normalizedImage = normalize_illumination(lit_page(lighting))
+        inkMask = remove_small_components(threshold_ink(normalizedImage))
+        paper = normalizedImage[cv2.dilate(inkMask, np.ones((5, 5), np.uint8)) == 0]
+        assert np.percentile(paper, 5) >= 245, name
+
+
+def test_ink_mask_under_uneven_lighting_matches_even_lighting():
+    evenPage = lit_page(1.0)
+    for name, lighting in lighting_patterns().items():
+        assert ink_mask_match(normalize_illumination(lit_page(lighting)), evenPage) > 0.98, name
+
+
+def test_hard_shadow_edge_is_not_turned_into_ink():
+    hardShadow = lit_page(lighting_patterns()["hard shadow"])
+    # Without correction the shadow edge corrupts the mask; with it, the mask matches even lighting
+    assert ink_mask_match(normalize_illumination(hardShadow), lit_page(1.0)) > \
+        ink_mask_match(hardShadow, lit_page(1.0))

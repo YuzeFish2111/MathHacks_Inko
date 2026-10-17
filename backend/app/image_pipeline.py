@@ -4,7 +4,8 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from .scoring_config import (TARGET_IMAGE_WIDTH_PX, BLUR_KERNEL_PX, THRESHOLD_BLOCK_SIZE_PX,
+from .scoring_config import (TARGET_IMAGE_WIDTH_PX, BACKGROUND_KERNEL_PX, BACKGROUND_SMOOTHING_PX,
+                             BLUR_KERNEL_PX, THRESHOLD_BLOCK_SIZE_PX,
                              THRESHOLD_OFFSET_C, MIN_COMPONENT_AREA_PX,
                              LINE_MIN_INK_FRACTION, LINE_MERGE_GAP_PX, LINE_MIN_HEIGHT_PX,
                              NEAR_LINE_MAX_GAP_RATIO, MARK_MAX_HEIGHT_RATIO, CLUSTER_MIN_WIDTH_RATIO,
@@ -185,6 +186,30 @@ def resize_to_width(image: np.ndarray, targetWidthPx: int = TARGET_IMAGE_WIDTH_P
     return cv2.resize(image, (targetWidthPx, targetHeightPx), interpolation=interpolation)
 
 
+def estimate_background(grayscaleImage: np.ndarray) -> np.ndarray:
+    """backgroundEstimate: how bright the bare paper is at every pixel.
+
+    A closing (dilate, then erode) with a window wider than any pen stroke lets the surrounding
+    paper grow over the dark ink, so only the lighting pattern is left. A small median blur then
+    smooths paper texture; unlike a Gaussian blur it keeps hard shadow edges sharp, so the edge of a
+    phone's or hand's shadow doesn't turn into a false line of ink.
+    """
+    window = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (BACKGROUND_KERNEL_PX, BACKGROUND_KERNEL_PX))
+    paperOnly = cv2.morphologyEx(grayscaleImage, cv2.MORPH_CLOSE, window)
+    return cv2.medianBlur(paperOnly, BACKGROUND_SMOOTHING_PX)
+
+
+def normalize_illumination(grayscaleImage: np.ndarray) -> np.ndarray:
+    """normalizedImage: divide by backgroundEstimate so paper becomes white everywhere.
+
+    Shadows and bright patches cancel out, and ink keeps its darkness relative to the paper
+    around it. The background is kept at least 1 to avoid dividing by zero.
+    """
+    backgroundEstimate = np.maximum(estimate_background(grayscaleImage).astype(np.float32), 1)
+    normalizedImage = grayscaleImage.astype(np.float32) / backgroundEstimate * 255
+    return np.clip(normalizedImage, 0, 255).astype(np.uint8)
+
+
 def threshold_ink(grayscaleImage: np.ndarray) -> np.ndarray:
     """Blur slightly, then adaptive-threshold into an ink mask (ink = 255, paper = 0)."""
     blurredImage = cv2.GaussianBlur(grayscaleImage, (BLUR_KERNEL_PX, BLUR_KERNEL_PX), 0)
@@ -299,11 +324,12 @@ def deskew(grayscaleImage: np.ndarray) -> tuple[np.ndarray, float]:
 
 
 def compute_ink_mask(originalImage: np.ndarray) -> tuple[np.ndarray, float]:
-    """Full chain: grayscale -> resize -> deskew -> threshold -> denoise.
+    """Full chain: grayscale -> resize -> lighting correction -> deskew -> threshold -> denoise.
 
     Returns (inkMask, deskewAngleDeg); inkMask has ink = 255, paper = 0.
     """
-    grayscaleImage, deskewAngleDeg = deskew(resize_to_width(to_grayscale(originalImage)))
+    normalizedImage = normalize_illumination(resize_to_width(to_grayscale(originalImage)))
+    grayscaleImage, deskewAngleDeg = deskew(normalizedImage)
     return remove_small_components(threshold_ink(grayscaleImage)), deskewAngleDeg
 
 

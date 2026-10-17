@@ -21,10 +21,10 @@ MathHacks_Project/
 |   |   |-- [x] schemas.py               Pydantic request/response models
 |   |   |-- [x] scoring_config.py        feature IDs, FEATURE_SOURCES, weights, curves, score bands,
 |   |   |                                pipeline / segmentation / deskew / measurement thresholds
-|   |   |-- [~] image_pipeline.py        decode, detect_page_corners, rectify_page, grayscale, resize, deskew,
+|   |   |-- [x] image_pipeline.py        decode, detect_page_corners, rectify_page, grayscale, resize,
+|   |   |                                lighting correction (backgroundEstimate -> normalizedImage), deskew,
 |   |   |                                threshold, denoise -> inkMask; contrast + edge sharpness;
 |   |   |                                LetterComponent, TextLine, find_text_lines, find_components
-|   |   |                                (still to do: uneven-lighting fix)
 |   |   |-- [x] measurements.py          the ten featureMeasurements; fit_baseline, find_gaps (overlays)
 |   |   |-- [x] scoring.py               curves, featureScores, legibilityScore, featureWeights,
 |   |   |                                missingFeatureIds, scoreLabel
@@ -33,7 +33,8 @@ MathHacks_Project/
 |   |-- scripts/
 |   |   `-- [x] preview_ink_mask.py      debug tool: prints and plots the ink mask (needs matplotlib)
 |   `-- tests/
-|       |-- [x] test_image_pipeline.py   lines, components, deskew, contrast, sharpness, page detection
+|       |-- [x] test_image_pipeline.py   lines, components, deskew, contrast, sharpness, page detection,
+|       |                                lighting correction
 |       |-- [x] test_measurements.py     all ten measurements on synthetic images
 |       |-- [x] test_scoring.py          curves, feature scores, renormalized weights, bands
 |       |-- [x] test_schemas.py          fixtures vs schema; TS and Python field names match
@@ -63,15 +64,14 @@ MathHacks_Project/
     `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results
 
 
-BACKEND PROGRESS  (70/70 tests passing; all on synthetic images)
+BACKEND PROGRESS  (74/74 tests passing; all on synthetic images)
 ================================================================
 Plan step                                   Status
 0. Lock contract                            [x] contract, fixtures, schemas.py, analysis.ts, drift tests
 2. Image input and page geometry            [x] upload checks, automatic page detection, manual-corner
                                                 rectification, mm scale, blur + contrast checks
-3. Preprocessing and segmentation           [~] ink mask, deskew, lines, components, marks/clusters,
-                                                segmentation check done;
-                                                uneven-lighting normalization not started
+3. Preprocessing and segmentation           [x] lighting correction, ink mask, deskew, lines, components,
+                                                marks/clusters, segmentation check
 4. Measurements                             [x] all ten, unit-tested
 5. Scoring and advice                       [x] feature scores, renormalized weights, bands, tips
 6. API, overlays, validation                [~] /api/analyze complete; overlays without issueFeatureIds;
@@ -87,7 +87,7 @@ Contract coverage
 
 Remaining backend work
   [ ] Test and tune thresholds on real phone photos (tests/sample-images/)
-  [ ] Uneven-lighting normalization (backgroundEstimate -> normalizedImage)
+  [x] Uneven-lighting normalization (backgroundEstimate -> normalizedImage)
   [x] Automatic page detection when no cornerPointsPx are sent
   [ ] Endpoint that returns detected corners for the preview/crop screen (contract addition)
   [ ] issueFeatureIds on overlay components and gaps

@@ -57,7 +57,9 @@ PAGE_MIN_BRIGHTNESS_GAIN = 15   # page must be this much brighter (0-255) than i
 
 # Image pipeline (backend/app/image_pipeline.py)
 TARGET_IMAGE_WIDTH_PX = 1000    # resize width, applied BEFORE thresholding
-BLUR_KERNEL_PX = 3              # Gaussian blur kernel size; must be odd
+BACKGROUND_KERNEL_PX = 31      # lighting-correction window; must be wider than any pen stroke (31 px ~ 6.5 mm on A4)
+BACKGROUND_SMOOTHING_PX = 5    # median blur on backgroundEstimate (smooths paper texture, keeps shadow edges sharp); odd
+BLUR_KERNEL_PX = 3             # Gaussian blur kernel size; must be odd
 THRESHOLD_BLOCK_SIZE_PX = 31    # adaptive threshold neighbourhood; must be odd and > 1
 THRESHOLD_OFFSET_C = 10         # subtracted from the local mean; higher = less ink detected
 MIN_COMPONENT_AREA_PX = 10       # ink blobs smaller than this are treated as noise

@@ -15,7 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from .advice import generate_advice
-from .image_pipeline import (decode_image, detect_page_corners, rectify_page, to_grayscale, resize_to_width, deskew,
+from .image_pipeline import (decode_image, detect_page_corners, rectify_page, to_grayscale, resize_to_width,
+                             normalize_illumination, deskew,
                              threshold_ink, remove_small_components, find_text_lines, find_components,
                              measure_ink_contrast, measure_edge_sharpness)
 from .measurements import compute_feature_measurements, find_gaps, fit_baseline, measure_x_height_px
@@ -156,7 +157,8 @@ def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
     scaleMmPerPxX = fields.pageWidthMm / pageWidthPx
     scaleMmPerPxY = fields.pageHeightMm / pageHeightPx
 
-    deskewedImage, _ = deskew(grayscaleImage)
+    # Correct uneven lighting before deskew, so shadows don't affect the angle search or the thresholds
+    deskewedImage, _ = deskew(normalize_illumination(grayscaleImage))
     return deskewedImage, scaleMmPerPxX, scaleMmPerPxY
 
 
