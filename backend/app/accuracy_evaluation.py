@@ -1,13 +1,23 @@
 """Preliminary OCR legibility score: how confidently EasyOCR can read the handwriting.
 
-Run:  python accuracy_evaluation.py [image path]    (default: same image as preprocessing.py)
+Not yet part of POST /api/analyze; adding it needs a contract change (new featureId, schemaVersion 1.2).
+
+Run from the backend/ folder:
+    python -m app.accuracy_evaluation [image path]     (default: data/image0(37).heic at the project root)
 The first run downloads the EasyOCR model, so it needs internet access.
+HEIC photos (iPhone) need:  pip install pillow-heif
 """
 import sys
+from pathlib import Path
 
+import cv2
 import numpy as np
 
-from preprocessing import DEFAULT_IMAGE_PATH, load_photo, preprocess
+from .image_pipeline import load_image, to_grayscale, resize_to_width
+
+# Found from this file's location, so it works from any folder
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_IMAGE_PATH = str(PROJECT_ROOT / "data" / "image0(37).heic")
 
 
 # STEP 7A: Load the pretrained English OCR model.
@@ -82,8 +92,24 @@ def measure_handwriting_legibility(gray_image, reader):
     return recognized_text, mean_confidence, legibility_score, results
 
 
+def load_photo(path):
+    """originalImage from any format OpenCV reads, plus HEIC (iPhone) through pillow-heif."""
+    if Path(path).suffix.lower() not in (".heic", ".heif"):
+        return load_image(path)
+    if not Path(path).exists():
+        raise FileNotFoundError(f"Could not read image: {path}")
+    try:
+        from pillow_heif import register_heif_opener
+    except ImportError:
+        raise ImportError("HEIC photos need pillow-heif: run  pip install pillow-heif") from None
+    from PIL import Image
+    register_heif_opener()
+    return cv2.cvtColor(np.array(Image.open(path).convert("RGB")), cv2.COLOR_RGB2BGR)
+
+
 def main(path):
-    gray, _, _ = preprocess(load_photo(path))
+    # Same input as the teammate's Step 3: grayscale, resized to the pipeline's standard width
+    gray = resize_to_width(to_grayscale(load_photo(path)))
     reader = load_reader()
 
     # Store the score for later use in your overall handwriting rating.

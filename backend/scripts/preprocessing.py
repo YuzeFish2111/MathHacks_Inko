@@ -1,6 +1,7 @@
 """Load a handwriting photo and turn it into a clean 0/1 ink matrix.
 
-Run:  python preprocessing.py [image path]       (default: data/image0(37).heic)
+Run from the backend/ folder:
+    python scripts/preprocessing.py [image path]     (default: data/image0(37).heic at the project root)
 HEIC photos (iPhone) need:  pip install pillow-heif
 """
 import sys
@@ -9,7 +10,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-DEFAULT_IMAGE_PATH = "data/image0(37).heic"
+# Found from this file's location, so it works from any folder
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_IMAGE_PATH = str(PROJECT_ROOT / "data" / "image0(37).heic")
 
 
 # STEP 1: Read image (any format OpenCV reads, plus HEIC through pillow-heif)

@@ -10,11 +10,16 @@ MathHacks_Project/
 |-- [x] .gitignore                       ignore list (node_modules/, .env, .DS_Store, __pycache__/,
 |                                        validation/samples/)
 |-- [x] project-structure.txt            this file
+|-- [x] instructions.txt                 how users should take their handwriting photos
+|-- data/                                real test photos from the team (PUBLIC on GitHub; see note below)
 |
 |-- backend/                             Python + FastAPI + OpenCV
 |   |-- [x] requirements.txt             numpy, opencv-python-headless, scipy, fastapi,
-|   |                                    python-multipart, pydantic, pytest, uvicorn, httpx
+|   |                                    python-multipart, pydantic, pytest, uvicorn, httpx,
+|   |                                    easyocr, matplotlib, pillow, pillow-heif
 |   |-- app/
+|   |   |-- [~] accuracy_evaluation.py   OCR confidence score with EasyOCR (teammate); runs on its own via
+|   |   |                                python -m app.accuracy_evaluation; NOT yet in /api/analyze
 |   |   |-- [x] __init__.py              marks app/ as a Python package (empty on purpose)
 |   |   |-- [x] main.py                  FastAPI app, POST /api/analyze, GET /api/health;
 |   |   |                                all 9 quality checks / error codes, overlays
@@ -31,6 +36,7 @@ MathHacks_Project/
 |   |   |-- [x] advice.py                weakest-first rule-based tips (templates per measurement + direction)
 |   |   `-- [ ] fit_weights.py           regression of weights against human ratings
 |   |-- scripts/
+|   |   |-- [x] preprocessing.py         teammate's preprocessing walkthrough: load (incl. HEIC), threshold, plot
 |   |   `-- [x] preview_ink_mask.py      debug tool: prints and plots the ink mask (needs matplotlib)
 |   `-- tests/
 |       |-- [x] test_image_pipeline.py   lines, components, deskew, contrast, sharpness, page detection,
@@ -64,7 +70,7 @@ MathHacks_Project/
     `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results
 
 
-BACKEND PROGRESS  (74/74 tests passing; all on synthetic images)
+BACKEND PROGRESS  (74/74 tests passing; tested on synthetic images, first real photos tried)
 ================================================================
 Plan step                                   Status
 0. Lock contract                            [x] contract, fixtures, schemas.py, analysis.ts, drift tests
@@ -76,6 +82,8 @@ Plan step                                   Status
 5. Scoring and advice                       [x] feature scores, renormalized weights, bands, tips
 6. API, overlays, validation                [~] /api/analyze complete; overlays without issueFeatureIds;
                                                 fit_weights.py and validation analysis not started
+Extra: OCR accuracy score                   [~] app/accuracy_evaluation.py works standalone (model download
+                                                needs Mac certificates fixed); not in the API or contract
 
 Contract coverage
   cornerPointsPx        [x] parsed, validated (4 points, inside photo), used to rectify the page;
@@ -85,11 +93,22 @@ Contract coverage
                             BLUR_TOO_HIGH, CONTRAST_TOO_LOW, PAGE_NOT_FOUND, NOT_ENOUGH_WRITING,
                             SEGMENTATION_UNCERTAIN
 
+Real-photo findings (data/, 5 photos)
+  - None followed the photo instructions (no page edges visible), so mm sizes were inflated and every
+    score was "Hard to read" (35-48): artefacts of the photos, not the handwriting.
+  - skibidi.jpeg is rotated 90 degrees; deskew only handles +/-15 degrees, so it measured sideways text.
+
 Remaining backend work
-  [ ] Test and tune thresholds on real phone photos (tests/sample-images/)
+  [ ] Handle photos rotated 90 / 180 / 270 degrees (try each, keep the most horizontal text lines)
+  [ ] Test and tune thresholds on real phone photos taken per instructions.txt (tests/sample-images/)
   [x] Uneven-lighting normalization (backgroundEstimate -> normalizedImage)
   [x] Automatic page detection when no cornerPointsPx are sent
   [ ] Endpoint that returns detected corners for the preview/crop screen (contract addition)
   [ ] issueFeatureIds on overlay components and gaps
   [ ] fit_weights.py once validation ratings exist
+  [ ] Decide whether the OCR score joins /api/analyze (needs featureId + schemaVersion 1.2; easyocr pulls in PyTorch)
   [ ] Optional: letter-level work (x-height consistency, comparison to an ideal example)
+
+Notes
+  - data/ is committed to a public GitHub repo; move any handwriting that isn't the team's own to
+    validation/samples/ (git-ignored) and get consent first.
