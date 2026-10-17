@@ -6,7 +6,6 @@ Two kinds of mark:
     shapeConsistency     a letter leans much more or less than the typical letter
     spacingConsistency   a letter gap is much wider or narrower than the typical gap
     letterSpacing        a letter gap is outside the ideal range, or letters are joined into a cluster
-    ocrReadability       a letter sits inside a word the OCR model read with low confidence
 - Whole-page problems: size, x-height and stroke can't be pinned on one letter, so when one of those
   features scores at or below ISSUE_MAX_FEATURE_SCORE, every letter is marked with it.
 All distances are compared as multiples of the x-height, so the rules work at any writing size.
@@ -18,8 +17,7 @@ import numpy as np
 from .image_pipeline import TextLine
 from .measurements import fit_baseline, letter_slant_deg
 from .scoring_config import (FEATURE_IDS, SWEET_SPOT_CURVES, ISSUE_MAX_FEATURE_SCORE,
-                             ISSUE_BASELINE_OFFSET_RATIO, ISSUE_SLANT_DEVIATION_DEG, ISSUE_GAP_DEVIATION_RATIO,
-                             ISSUE_OCR_MIN_CONFIDENCE)
+                             ISSUE_BASELINE_OFFSET_RATIO, ISSUE_SLANT_DEVIATION_DEG, ISSUE_GAP_DEVIATION_RATIO)
 
 WHOLE_PAGE_FEATURE_IDS = ("textSize", "xHeight", "strokeContrast", "strokeWeight")
 
@@ -29,12 +27,8 @@ def _in_feature_order(featureIds: set[str]) -> list[str]:
 
 
 def find_component_issues(textLines: list[TextLine], xHeightPx: Optional[float],
-                          featureScores: dict[str, Optional[float]],
-                          ocrDetections: Optional[list] = None) -> dict[str, list[str]]:
-    """componentId -> issueFeatureIds for every component (empty list when it has no problem).
-
-    ocrDetections: EasyOCR (boundingBox, text, confidence) tuples in the same image's pixels, if OCR ran.
-    """
+                          featureScores: dict[str, Optional[float]]) -> dict[str, list[str]]:
+    """componentId -> issueFeatureIds for every component (empty list when it has no problem)."""
     issues = {component.componentId: set() for line in textLines for component in line.components}
     letters = [component for line in textLines for component in line.components if component.kind == "letter"]
 
@@ -84,18 +78,6 @@ def find_component_issues(textLines: list[TextLine], xHeightPx: Optional[float],
         for componentId, slantDeg in slantsDeg.items():
             if slantDeg is not None and abs(slantDeg - medianSlantDeg) > ISSUE_SLANT_DEVIATION_DEG:
                 issues[componentId].add("shapeConsistency")
-
-    # OCR: letters whose centre lies inside a word the model read with low confidence
-    for boundingBox, _, confidence in ocrDetections or []:
-        if confidence >= ISSUE_OCR_MIN_CONFIDENCE:
-            continue
-        boxXs, boxYs = [point[0] for point in boundingBox], [point[1] for point in boundingBox]
-        for line in textLines:
-            for component in line.components:
-                centerXPx = component.xPx + component.widthPx / 2
-                centerYPx = component.yPx + component.heightPx / 2
-                if min(boxXs) <= centerXPx <= max(boxXs) and min(boxYs) <= centerYPx <= max(boxYs):
-                    issues[component.componentId].add("ocrReadability")
 
     return {componentId: _in_feature_order(featureIds) for componentId, featureIds in issues.items()}
 

@@ -11,7 +11,7 @@ Put your name next to an item when you take it.
 |---|------|-----------------|-------|
 | 1 | **Take 5-10 real photos that follow `instructions.txt`** (whole page visible, darker table, even light, the pangram in print). Save them in `tests/sample-images/`. | Every real photo so far (`data/`) breaks the instructions, so all their scores are meaningless (35-48, "Hard to read"). Nothing can be tuned without proper photos. | |
 | 2 | **Run those photos through the API** (`http://127.0.0.1:8000/docs`) and write down the score, warnings and any wrong overlay marks. | The thresholds in `backend/app/scoring_config.py` are first guesses. This shows which ones are wrong. | |
-| 3 | **Fix the Mac certificate problem**: open Applications > Python 3.14 > *Install Certificates.command*, then restart the server. | Without it the OCR model can't download, so `ocrReadability` is always missing. OCR has only ever been tested with a fake. | |
+| 3 | **Fix the Mac certificate problem**: open Applications > Python 3.14 > *Install Certificates.command*, then restart the server. | Without it the OCR model can't download, so "what a computer read" (`recognizedText`) is never shown. It's display-only, so this doesn't block scoring. | |
 | 4 | **Set up the React app** in `frontend/` (step 2 of `frontend/README.md`). | There is no runnable frontend yet, so there's nothing to demo. | |
 | 5 | **Decide on the page-corner preview** (see below). | The preview/crop screen needs it, and it changes what the frontend builds. | |
 
@@ -31,7 +31,7 @@ Recommendation: build Option A first, add B if time allows.
 | 6 | **Photos in `data/` were removed from the repo**, but they are still in git history. If any weren't the team's own handwriting, rewrite the history (`git filter-repo --path data --invert-paths`) and force-push; everyone then re-clones. New consented samples go in `validation/samples/` (git-ignored). | Privacy: the plan requires consent for samples. | |
 | 7 | **Start collecting validation ratings**: 30-60 samples, each rated 1-10 by 3+ people who haven't seen the app's score (`validation/ratings.csv`). | Takes the longest, because it needs other people's time. Without it we can't say how well the score matches human judgement. | |
 | 8 | **Feature-bar ideal ranges for the frontend**: the API doesn't send them. Copy them into the frontend (see `frontend/README.md`, step 9) or add them to the API response. | The results screen must show "your value vs. the ideal range". | |
-| 9 | **Re-check scores once OCR runs for real**: EasyOCR may "read" messy writing correctly because the pangram is famous, which makes its confidence too high. Compare a messy and a neat sample. | Decides whether OCR deserves its 1/9 weight. | |
+| 9 | **Check what OCR shows once it runs for real**: EasyOCR may "read" messy writing correctly because the pangram is famous. It no longer affects the score, but check the displayed text isn't misleading. | The demo shows it to users. | |
 | 10 | **After `pip install`, check OpenCV still works** (`python3 -c "import cv2"`). `easyocr` can install a second OpenCV (`opencv-python`) that clashes with `opencv-python-headless`; if so, `pip uninstall opencv-python`. | A clash breaks the whole backend. | |
 
 ## Later (nice to have)

@@ -40,7 +40,7 @@ def error_code(response):
 
 
 def test_health():
-    assert client.get("/api/health").json() == {"status": "ok", "schemaVersion": "1.3"}
+    assert client.get("/api/health").json() == {"status": "ok", "schemaVersion": "1.4"}
 
 
 def test_complete_result_without_corners():
@@ -157,27 +157,26 @@ def test_bad_form_fields_are_http_422():
                        files={"imageFile": ("p.png", png_bytes(make_page_photo()), "image/png")}).status_code == 422
 
 
-def test_ocr_result_is_scored_returned_and_marked(monkeypatch):
-    # A fake OCR that reads the page, with one low-confidence word covering the top-left of the writing
-    lowConfidenceBox = [[0, 0], [400, 0], [400, 600], [0, 600]]
-    fakeResult = OcrResult(confidencePct=82.0, recognizedText="The quick brown fox\njumps over the lazy dog.",
-                           detections=[(lowConfidenceBox, "The quick", 0.2)])
-    monkeypatch.setattr(mainModule, "read_handwriting", lambda grayscaleImage: fakeResult)
+def test_recognized_text_is_shown_but_never_changes_the_score(monkeypatch):
+    baseline = post(png_bytes(make_page_photo())).json()        # conftest: OCR unavailable
 
+    fakeResult = OcrResult(confidencePct=5.0, recognizedText="The quick brown fox\njumps over the lazy dog.",
+                           detections=[([[0, 0], [400, 0], [400, 600], [0, 600]], "The quick", 0.05)])
+    monkeypatch.setattr(mainModule, "read_handwriting", lambda grayscaleImage: fakeResult)
     body = post(png_bytes(make_page_photo())).json()
     AnalysisResponse.model_validate(body)
-    assert body["featureMeasurements"]["ocrConfidencePct"] == 82.0
+
     assert body["recognizedText"] == "The quick brown fox\njumps over the lazy dog."
-    assert body["featureScores"]["ocrReadability"] is not None
-    assert "ocrReadability" in body["featureWeights"] and "ocrReadability" not in body["missingFeatureIds"]
+    # Even a terrible OCR confidence leaves every score, weight, mark and tip exactly as without OCR
+    for field in ("legibilityScore", "scoreLabel", "featureScores", "featureWeights", "missingFeatureIds",
+                  "featureMeasurements", "overlayData", "advice"):
+        assert body[field] == baseline[field], field
     assert not any("Text recognition" in warning for warning in body["warnings"])
-    markedComponents = [c for c in body["overlayData"]["components"] if "ocrReadability" in c["issueFeatureIds"]]
-    assert markedComponents and all(c["xPx"] + c["widthPx"] / 2 <= 400 for c in markedComponents)
 
 
 def test_api_still_works_when_ocr_is_unavailable():
     body = post(png_bytes(make_page_photo())).json()          # conftest makes OCR unavailable
     assert body["status"] == "complete" and body["legibilityScore"] is not None
-    assert body["recognizedText"] is None and body["featureMeasurements"]["ocrConfidencePct"] is None
-    assert body["missingFeatureIds"] == ["ocrReadability"]
-    assert sum(1 for warning in body["warnings"] if "ocrReadability" in warning or "Text recognition" in warning) == 1
+    assert body["recognizedText"] is None
+    assert "ocrReadability" not in body["featureScores"] and "ocrConfidencePct" not in body["featureMeasurements"]
+    assert sum(1 for warning in body["warnings"] if "Text recognition" in warning) == 1

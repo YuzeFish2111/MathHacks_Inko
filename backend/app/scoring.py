@@ -1,4 +1,4 @@
-"""Turn the nine raw measurements into nine 0-1 feature scores, one 0-100 legibilityScore and a label.
+"""Turn the eight raw measurements into eight 0-1 feature scores, one 0-100 legibilityScore and a label.
 
 1. Each measurement goes through its curve (scoring_config.py) to a 0-1 score.
 2. Each feature takes its measurement's score (a feature with several sources would average them).
@@ -9,7 +9,7 @@ import math
 
 from typing import Optional
 from .scoring_config import (FEATURE_IDS, FEATURE_WEIGHTS, FEATURE_SOURCES,
-                             SWEET_SPOT_CURVES, DECREASING_CURVES, INCREASING_CURVES, SCORE_BANDS)
+                             SWEET_SPOT_CURVES, DECREASING_CURVES, SCORE_BANDS)
 
 
 def _is_missing(value: Optional[float]) -> bool:
@@ -41,25 +41,12 @@ def decreasing_score(value: Optional[float], v0: float, v1: float) -> Optional[f
     return (v1 - value) / (v1 - v0)
 
 
-def increasing_score(value: Optional[float], v0: float, v1: float) -> Optional[float]:
-    """Linear increase: 0 at or below v0, 1 at or above v1."""
-    if _is_missing(value):
-        return None
-    if value <= v0:
-        return 0.0
-    if value >= v1:
-        return 1.0
-    return (value - v0) / (v1 - v0)
-
-
 def score_measurement(measurementName: str, value: Optional[float]) -> Optional[float]:
     """Score one raw measurement 0-1 with the curve configured for it in scoring_config.py."""
     if measurementName in SWEET_SPOT_CURVES:
         return sweet_spot_score(value, *SWEET_SPOT_CURVES[measurementName])
     if measurementName in DECREASING_CURVES:
         return decreasing_score(value, *DECREASING_CURVES[measurementName])
-    if measurementName in INCREASING_CURVES:
-        return increasing_score(value, *INCREASING_CURVES[measurementName])
     raise KeyError(f"No curve configured for measurement {measurementName!r}")
 
 

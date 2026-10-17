@@ -8,11 +8,11 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "1.3"    # 1.2 added OCR; 1.3 removed aspectRatioCv and solidityCv
+SCHEMA_VERSION = "1.4"    # 1.2 added OCR; 1.3 removed aspectRatioCv/solidityCv; 1.4 made OCR display-only
 
 # Literal[...] = only these exact strings are allowed; any other value fails validation
 FeatureId = Literal["textSize", "xHeight", "baselineConsistency", "shapeConsistency",
-                    "strokeContrast", "strokeWeight", "letterSpacing", "spacingConsistency", "ocrReadability"]
+                    "strokeContrast", "strokeWeight", "letterSpacing", "spacingConsistency"]
 CheckId = Literal["fileType", "fileSize", "decode", "imageSize", "blur", "contrast",
                   "pageBounds", "inkAmount", "segmentation"]
 ErrorCode = Literal["INVALID_FILE_TYPE", "FILE_TOO_LARGE", "IMAGE_DECODE_FAILED", "IMAGE_TOO_SMALL",
@@ -51,7 +51,7 @@ class QualityCheck(ContractModel):
 
 
 class FeatureMeasurements(ContractModel):
-    """The nine raw measurements. None (null) means it could not be estimated; 0 is a real value."""
+    """The eight raw measurements. None (null) means it could not be estimated; 0 is a real value."""
     textSizeMm: Optional[float]
     xHeightMm: Optional[float]
     baselineVariationMm: Optional[float]
@@ -60,7 +60,6 @@ class FeatureMeasurements(ContractModel):
     strokeWidthMedianMm: Optional[float]
     relativeLetterSpacing: Optional[float]
     letterSpacingCv: Optional[float]
-    ocrConfidencePct: Optional[float] = Field(ge=0, le=100)    # null if OCR is unavailable or read nothing
 
 
 class FeatureScores(ContractModel):
@@ -73,7 +72,6 @@ class FeatureScores(ContractModel):
     strokeWeight: Optional[float] = Field(ge=0, le=1)
     letterSpacing: Optional[float] = Field(ge=0, le=1)
     spacingConsistency: Optional[float] = Field(ge=0, le=1)
-    ocrReadability: Optional[float] = Field(ge=0, le=1)
 
 
 class OverlayLine(ContractModel):
@@ -126,13 +124,13 @@ class AdviceItem(ContractModel):
 # ---------- full response ----------
 
 class AnalysisResponse(ContractModel):
-    schemaVersion: Literal["1.3"]
+    schemaVersion: Literal["1.4"]
     status: AnalysisStatus
     error: Optional[AnalysisError]
     legibilityScore: Optional[int] = Field(ge=0, le=100)    # whole number for display; see scoring.py
     scoreLabel: Optional[str]
     rectifiedImage: Optional[str]    # data URL (PNG or JPEG) that overlayData refers to
-    recognizedText: Optional[str]    # what the OCR model read; null if OCR is unavailable or didn't run
+    recognizedText: Optional[str]    # what the OCR model read, display only; null if OCR is unavailable
     featureMeasurements: Optional[FeatureMeasurements]
     featureScores: Optional[FeatureScores]
     # Weights actually used, renormalized over available features; missing features are left out

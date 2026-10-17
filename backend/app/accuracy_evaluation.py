@@ -1,8 +1,9 @@
-"""OCR readability: how confidently a text-recognition model (EasyOCR) can read the handwriting.
+"""Text recognition with EasyOCR: what a computer reads in the handwriting, and how confidently.
 
-POST /api/analyze calls read_handwriting(); its confidence becomes the ocrConfidencePct measurement
-(feature ocrReadability) and its text becomes recognizedText. If EasyOCR isn't installed or its model
-can't load, read_handwriting() returns None and the feature is simply left out of the score.
+POST /api/analyze calls read_handwriting() and returns its text as recognizedText, for display only:
+OCR never affects the score (OCR confidence isn't calibrated, and models can guess a famous sentence
+like the pangram even from messy writing). If EasyOCR isn't installed or its model can't load,
+read_handwriting() returns None and recognizedText is null.
 
 Run on its own from the backend/ folder:
     python -m app.accuracy_evaluation <image path>     (e.g. a photo in tests/sample-images/)
@@ -49,7 +50,7 @@ def get_reader():
         try:
             _reader = load_reader()
         except Exception:    # not installed, no internet for the model download, certificate problems...
-            logger.exception("EasyOCR could not be loaded; ocrReadability will be left out of scores")
+            logger.exception("EasyOCR could not be loaded; recognizedText will be null")
             _readerLoadFailed = True
             return None
     return _reader

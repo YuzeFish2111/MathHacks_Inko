@@ -1,6 +1,6 @@
 # Guide: fitting the feature weights to human ratings
 
-**Goal:** replace the placeholder equal weights (1/9 each, in `backend/app/scoring_config.py`) with
+**Goal:** replace the placeholder equal weights (1/8 each, in `backend/app/scoring_config.py`) with
 weights learned from how people actually rate handwriting, and measure how well the app's score
 agrees with people. This follows the "Validation and weight fitting" section of the project plan.
 
@@ -8,7 +8,7 @@ agrees with people. This follows the "Validation and weight fitting" section of 
 (`pip install -r backend/requirements.txt`), and about a day spread over a week (most of it is
 waiting for ratings).
 
-**The honest expectation:** with 30-60 samples and 9 features, fitted weights are noisy. It's quite
+**The honest expectation:** with 30-60 samples and 8 features, fitted weights are noisy. It's quite
 likely that equal weights do just as well, and that is a valid, reportable result. The point is to
 *test* the weights, not to force a change.
 
@@ -76,7 +76,8 @@ with open("validation/split.csv", "w", newline="") as f:
 
 ## Step 4: Get the app's feature scores for every sample
 
-Run from the `backend/` folder. This calls the real API in-process, with OCR on if it's set up.
+Run from the `backend/` folder. This calls the real API in-process. (OCR doesn't affect the scores,
+so it doesn't matter whether it's set up.)
 
 ```python
 # backend/scripts/score_samples.py
@@ -105,9 +106,7 @@ print("scored", len(rows), "| needs better photo:", skipped)
 ```
 
 - Re-photograph any sample that comes back as "needs better photo", rather than dropping it silently.
-- **Use the same settings for every sample.** If OCR works for some runs and not others, the
-  `ocrReadability` column will be half empty. Either get OCR working first or set
-  `OCR_ENABLED = False` and fit 8 features.
+- **Use the same settings for every sample** (same paper size, same code version).
 - The plan says to fit only on samples where **all** feature scores are present. Write down how many
   were left out, and why.
 
@@ -198,7 +197,7 @@ For each sample: `humanLegibilityRating` = the mean of its ratings (1-10). Put i
 y = 100 * (humanLegibilityRating - 1) / 9      # 1 -> 0, 10 -> 100
 ```
 
-`F` is the matrix of the 9 feature scores (0-1) from `features.csv`, rows in the same sample order as `y`.
+`F` is the matrix of the 8 feature scores (0-1) from `features.csv`, rows in the same sample order as `y`.
 
 ---
 
@@ -206,7 +205,7 @@ y = 100 * (humanLegibilityRating - 1) / 9      # 1 -> 0, 10 -> 100
 
 ```python
 import numpy as np
-correlations = np.corrcoef(F_train, rowvar=False)              # 9 x 9 table
+correlations = np.corrcoef(F_train, rowvar=False)              # 8 x 8 table
 
 def vif(F):
     """Variance inflation factor per feature: 1 / (1 - R^2 of that feature predicted from the others)."""
@@ -327,6 +326,6 @@ is a strong result. With about 15-20 test samples the confidence interval will b
 ## Common mistakes
 - Looking at the test set before step 11.
 - Raters seeing the app's score, each other's ratings, or knowing whose writing it is.
-- Mixing runs with and without OCR, or photographed under different conditions.
+- Mixing samples scored with different code versions, or photographed under different conditions.
 - Tuning the curves and the weights at the same time.
 - Reporting fitted weights without their confidence intervals, or without comparing them with equal weights.

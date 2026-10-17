@@ -220,7 +220,7 @@ def measure_letter_spacing_cv(letterGapsPx: list[float]) -> Optional[float]:
 def compute_feature_measurements(inkMask: np.ndarray, textLines: list[TextLine],
                                  scaleMmPerPxX: Optional[float],
                                  scaleMmPerPxY: Optional[float]) -> dict[str, Optional[float]]:
-    """Return the eight measurements computed from the image (OCR adds ocrConfidencePct).
+    """Return featureMeasurements: all eight canonical measurements.
 
     mm values are None when the scale is unknown; unitless values and degrees are still measured.
     """

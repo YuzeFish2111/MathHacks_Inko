@@ -34,7 +34,7 @@ uvicorn app.main:app --reload
 ```
 
 Check it's running:
-- http://127.0.0.1:8000/api/health should show `{"status":"ok","schemaVersion":"1.3"}`
+- http://127.0.0.1:8000/api/health should show `{"status":"ok","schemaVersion":"1.4"}`
 - http://127.0.0.1:8000/docs lets you upload a photo by hand and see the real response
 
 Keep this terminal open while you work on the frontend.
@@ -259,7 +259,8 @@ Show, top to bottom:
    Each bar shows the 0-100 score, the raw measurement with its unit, and the ideal range.
    Show features listed in `missingFeatureIds` as "Not measured" at the end.
 4. **Tips**: `advice` (at most 3), each with `title`, `message` and `exercise`.
-5. **What a computer read**: `recognizedText`, if it isn't `null`.
+5. **What a computer read**: `recognizedText`, if it isn't `null`. It's for interest only and never
+   affects the score, so don't show it as a score or a bar.
 6. **Warnings**: `warnings` as small notes (e.g. page edges not found).
 7. **Try again** button.
 
@@ -278,7 +279,6 @@ changes that file, update this table and the constants file together.
 | `strokeWeight` | Pen thickness | `strokeWidthMedianMm` | mm | 0.3-0.8 |
 | `letterSpacing` | Space between letters | `relativeLetterSpacing` | x letter height | 0.15-0.6 |
 | `spacingConsistency` | Even spacing | `letterSpacingCv` | % variation (x 100) | 15% or less |
-| `ocrReadability` | Computer readability | `ocrConfidencePct` | % | 85% or more |
 
 ### Overlay canvas (`src/components/OverlayCanvas.tsx`)
 

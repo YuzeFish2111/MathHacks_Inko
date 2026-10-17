@@ -13,15 +13,12 @@ How a raw measurement becomes a 0-1 feature score:
   Decreasing curve (v0, v1), used for variation, where less is always better:
       score 1 at or below v0, falling in a straight line to 0 at v1 and above.
 
-  Increasing curve (v0, v1), used where more is always better (OCR confidence):
-      score 0 at or below v0, rising in a straight line to 1 at v1 and above.
-
 All curve values and weights are first guesses (placeholders). The plan is to check them against
 blind human ratings (backend/app/fit_weights.py) before claiming the score is calibrated.
 """
 
 FEATURE_IDS = ("textSize", "xHeight", "baselineConsistency", "shapeConsistency",
-               "strokeContrast", "strokeWeight", "letterSpacing", "spacingConsistency", "ocrReadability")
+               "strokeContrast", "strokeWeight", "letterSpacing", "spacingConsistency")
 
 # featureId -> source measurement(s); a feature with several sources is the mean of their available scores
 FEATURE_SOURCES = {
@@ -33,12 +30,10 @@ FEATURE_SOURCES = {
     "strokeWeight":        ("strokeWidthMedianMm",),
     "letterSpacing":       ("relativeLetterSpacing",),
     "spacingConsistency":  ("letterSpacingCv",),
-    "ocrReadability":      ("ocrConfidencePct",),    # how confidently a text-recognition model reads it
 }
 
-# Equal weights (1/9 each) until human ratings exist; the final score is the weighted average of the
+# Equal weights (1/8 each) until human ratings exist; the final score is the weighted average of the
 # available feature scores, with weights rescaled to sum to 1 when some features can't be measured
-# (e.g. if OCR is unavailable, the other eight share the weight)
 FEATURE_WEIGHTS = {featureId: 1 / len(FEATURE_IDS) for featureId in FEATURE_IDS}   # replaced by regression later
 # After regression: FEATURE_WEIGHTS = {"textSize": 0.09, "xHeight": 0.21, ...}
 
@@ -53,9 +48,6 @@ DECREASING_CURVES = {          # (perfect value v0, zero-score value v1)
     "slantStdDeg":         (2.0, 20.0),
     "strokeContrastRatio": (1.2, 4.0),
     "letterSpacingCv":     (0.15, 1.0),
-}
-INCREASING_CURVES = {          # (zero-score value v0, perfect value v1); placeholder values
-    "ocrConfidencePct":    (30.0, 85.0),
 }
 SCORE_BANDS = ((85, "Very legible"), (70, "Readable"), (50, "Some difficulty"), (0, "Hard to read"))
 
@@ -73,10 +65,9 @@ ISSUE_SLANT_DEVIATION_DEG = 25.0   # letter leaning this much more/less than the
 ISSUE_GAP_DEVIATION_RATIO = 0.25   # letter gap differing from the median gap by this -> spacingConsistency
 # A gap outside the relativeLetterSpacing ideal range (sweet-spot b..c) is marked letterSpacing
 
-# Text recognition (backend/app/accuracy_evaluation.py)
-OCR_ENABLED = True              # False skips OCR: ocrReadability is then missing and the other features rescale
+# Text recognition (backend/app/accuracy_evaluation.py): display only, never part of the score
+OCR_ENABLED = True              # False skips OCR: recognizedText is then null
 OCR_LANGUAGES = ("en",)
-ISSUE_OCR_MIN_CONFIDENCE = 0.5  # letters inside a word the OCR read with less confidence -> ocrReadability mark
 
 # Upload and photo checks (backend/app/main.py)
 ALLOWED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")

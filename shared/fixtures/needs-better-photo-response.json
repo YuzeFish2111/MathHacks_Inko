@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.3",
+  "schemaVersion": "1.4",
   "status": "needs_better_photo",
   "error": {
     "code": "BLUR_TOO_HIGH",

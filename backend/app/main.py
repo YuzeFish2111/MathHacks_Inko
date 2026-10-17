@@ -206,7 +206,7 @@ def segment_writing(grayscaleImage: np.ndarray, qualityChecks: list[dict]):
 
 # ---------- 7. Overlays: what the browser draws on top of rectifiedImage ----------
 
-def build_overlay_data(inkMask: np.ndarray, textLines, featureScores: dict, ocrDetections=None) -> dict:
+def build_overlay_data(inkMask: np.ndarray, textLines, featureScores: dict) -> dict:
     """Baseline and x-height lines, component boxes and gap boxes, all in rectifiedImage pixels.
 
     Each box's issueFeatureIds lists the features it shows a problem with (see issues.py).
@@ -228,7 +228,7 @@ def build_overlay_data(inkMask: np.ndarray, textLines, featureScores: dict, ocrD
             lines.append({"lineId": line.lineId, "kind": "xHeight",
                           "x1Px": x1Px, "y1Px": y1Px - xHeightPx, "x2Px": x2Px, "y2Px": y2Px - xHeightPx})
 
-    componentIssues = find_component_issues(textLines, xHeightPx, featureScores, ocrDetections)
+    componentIssues = find_component_issues(textLines, xHeightPx, featureScores)
     components = [{"componentId": component.componentId, "lineId": line.lineId,
                    "xPx": component.xPx, "yPx": component.yPx,
                    "widthPx": component.widthPx, "heightPx": component.heightPx,
@@ -277,21 +277,17 @@ async def analyze(
 
     featureMeasurements = compute_feature_measurements(inkMask, textLines, scaleMmPerPxX, scaleMmPerPxY)
 
-    # OCR on the same straightened page the overlays use, so its word boxes line up. It takes a second
-    # or two of CPU, so it runs in a worker thread instead of blocking the server for other requests.
-    ocrResult = await run_in_threadpool(read_handwriting, pageImage)
-    featureMeasurements["ocrConfidencePct"] = ocrResult.confidencePct if ocrResult else None
-    if ocrResult is None:
-        warnings.append("Text recognition isn't available on this server, so OCR readability was left out "
-                        "of the score.")
-
     scoring = score_measurements(featureMeasurements)
-    # OCR being unavailable already has its own warning above
-    unexplainedMissingIds = [featureId for featureId in scoring["missingFeatureIds"]
-                             if not (featureId == "ocrReadability" and ocrResult is None)]
-    if unexplainedMissingIds:
+    if scoring["missingFeatureIds"]:
         warnings.append("Some features could not be measured and were left out of the score: "
-                        + ", ".join(unexplainedMissingIds) + ".")
+                        + ", ".join(scoring["missingFeatureIds"]) + ".")
+
+    # OCR is display only ("what a computer read"); it never affects the score. It takes a second or two
+    # of CPU, so it runs in a worker thread instead of blocking the server for other requests.
+    ocrResult = await run_in_threadpool(read_handwriting, pageImage)
+    if ocrResult is None:
+        warnings.append("Text recognition isn't available on this server, so \"what a computer read\" "
+                        "can't be shown.")
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -303,7 +299,6 @@ async def analyze(
         "featureMeasurements": featureMeasurements,
         "warnings": warnings,
         "qualityChecks": qualityChecks,
-        "overlayData": build_overlay_data(inkMask, textLines, scoring["featureScores"],
-                                          ocrResult.detections if ocrResult else None),
+        "overlayData": build_overlay_data(inkMask, textLines, scoring["featureScores"]),
         "advice": generate_advice(scoring["featureScores"], featureMeasurements),
     }

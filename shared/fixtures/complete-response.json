@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.3",
+  "schemaVersion": "1.4",
   "status": "complete",
   "error": null,
   "legibilityScore": 78,
@@ -14,8 +14,7 @@
     "strokeContrastRatio": 1.8,
     "strokeWidthMedianMm": 0.42,
     "relativeLetterSpacing": 0.31,
-    "letterSpacingCv": 0.38,
-    "ocrConfidencePct": 82.5
+    "letterSpacingCv": 0.38
   },
   "featureScores": {
     "textSize": 0.86,
@@ -25,19 +24,17 @@
     "strokeContrast": 0.78,
     "strokeWeight": 0.84,
     "letterSpacing": 0.68,
-    "spacingConsistency": 0.61,
-    "ocrReadability": 0.95
+    "spacingConsistency": 0.61
   },
   "featureWeights": {
-    "textSize": 0.1111,
-    "xHeight": 0.1111,
-    "baselineConsistency": 0.1111,
-    "shapeConsistency": 0.1111,
-    "strokeContrast": 0.1111,
-    "strokeWeight": 0.1111,
-    "letterSpacing": 0.1111,
-    "spacingConsistency": 0.1111,
-    "ocrReadability": 0.1111
+    "textSize": 0.125,
+    "xHeight": 0.125,
+    "baselineConsistency": 0.125,
+    "shapeConsistency": 0.125,
+    "strokeContrast": 0.125,
+    "strokeWeight": 0.125,
+    "letterSpacing": 0.125,
+    "spacingConsistency": 0.125
   },
   "missingFeatureIds": [],
   "warnings": [],

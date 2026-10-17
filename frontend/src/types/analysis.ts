@@ -2,7 +2,7 @@
 // Must match backend/app/schemas.py field-for-field; see shared/analysis-contract.md.
 // null means "could not be estimated"; 0 is a real measurement.
 
-export const SCHEMA_VERSION = "1.3"; // 1.2 added OCR; 1.3 removed aspectRatioCv and solidityCv
+export const SCHEMA_VERSION = "1.4"; // 1.2 added OCR; 1.3 removed aspectRatioCv/solidityCv; 1.4 made OCR display-only
 
 export type FeatureId =
   | "textSize"
@@ -12,8 +12,7 @@ export type FeatureId =
   | "strokeContrast"
   | "strokeWeight"
   | "letterSpacing"
-  | "spacingConsistency"
-  | "ocrReadability";
+  | "spacingConsistency";
 
 export type CheckId =
   | "fileType"
@@ -66,7 +65,7 @@ export interface QualityCheck {
   message: string | null;
 }
 
-/** The nine raw measurements. */
+/** The eight raw measurements. */
 export interface FeatureMeasurements {
   textSizeMm: number | null;
   xHeightMm: number | null;
@@ -76,8 +75,6 @@ export interface FeatureMeasurements {
   strokeWidthMedianMm: number | null;
   relativeLetterSpacing: number | null;
   letterSpacingCv: number | null;
-  /** How confidently the OCR model read the writing, 0-100; null if OCR is unavailable or read nothing. */
-  ocrConfidencePct: number | null;
 }
 
 /** featureId -> 0-1 normalizedScore, or null when missing. Every key is always sent. */
@@ -136,7 +133,7 @@ export interface AdviceItem {
 // ---------- full response ----------
 
 export interface AnalysisResponse {
-  schemaVersion: "1.3";
+  schemaVersion: "1.4";
   status: AnalysisStatus;
   error: AnalysisError | null;
   /** Final 0-100 score, or null. */
@@ -144,7 +141,7 @@ export interface AnalysisResponse {
   scoreLabel: string | null;
   /** Data URL (PNG or JPEG) of the rectified page that overlayData refers to. */
   rectifiedImage: string | null;
-  /** What the OCR model read; null if OCR is unavailable or didn't run. */
+  /** What the OCR model read, for display only (never part of the score); null if OCR is unavailable. */
   recognizedText: string | null;
   featureMeasurements: FeatureMeasurements | null;
   featureScores: FeatureScores | null;

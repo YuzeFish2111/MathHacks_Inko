@@ -2,10 +2,10 @@ import math
 
 import app.scoring
 
-from app.scoring import (sweet_spot_score, decreasing_score, increasing_score, score_measurement,
+from app.scoring import (sweet_spot_score, decreasing_score, score_measurement,
                          compute_feature_scores, compute_legibility_score, score_label, score_measurements)
 from app.scoring_config import (FEATURE_IDS, FEATURE_SOURCES, FEATURE_WEIGHTS,
-                                SWEET_SPOT_CURVES, DECREASING_CURVES, INCREASING_CURVES)
+                                SWEET_SPOT_CURVES, DECREASING_CURVES)
 
 TEXT_SIZE_CURVE = (1.5, 3.0, 7.0, 12.0)
 
@@ -39,13 +39,13 @@ def test_missing_values_stay_null():
 PERFECT_MEASUREMENTS = {
     "textSizeMm": 5.0, "xHeightMm": 3.0, "baselineVariationMm": 0.2,
     "slantStdDeg": 1.0, "strokeContrastRatio": 1.1, "strokeWidthMedianMm": 0.5,
-    "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1, "ocrConfidencePct": 95.0,
+    "relativeLetterSpacing": 0.3, "letterSpacingCv": 0.1,
 }
 
 
 def test_every_source_measurement_has_exactly_one_curve():
     sources = {name for names in FEATURE_SOURCES.values() for name in names}
-    curves = [set(SWEET_SPOT_CURVES), set(DECREASING_CURVES), set(INCREASING_CURVES)]
+    curves = [set(SWEET_SPOT_CURVES), set(DECREASING_CURVES)]
     assert sources == set.union(*curves)
     assert sum(len(curve) for curve in curves) == len(sources)        # no measurement has two curves
     assert set(FEATURE_SOURCES) == set(FEATURE_IDS) == set(FEATURE_WEIGHTS)
@@ -81,9 +81,9 @@ def test_missing_features_are_excluded_not_counted_as_zero_or_perfect():
 
     assert missingFeatureIds == ["textSize", "xHeight"]
     assert set(featureWeights) == set(FEATURE_IDS) - {"textSize", "xHeight"}
-    assert all(abs(weight - 1 / 7) < 1e-9 for weight in featureWeights.values())   # 1/9 renormalized over 7
-    # shapeConsistency (slant 25 degrees) = 0; the other six are 1 -> 6 / 7 = 85.7
-    assert legibilityScore == 86
+    assert all(abs(weight - 1 / 6) < 1e-9 for weight in featureWeights.values())   # 1/8 renormalized over 6
+    # shapeConsistency (slant 25 degrees) = 0; the other five are 1 -> 5 / 6 = 83.3
+    assert legibilityScore == 83
 
 
 def test_no_features_gives_null_score():
@@ -115,18 +115,3 @@ def test_score_rounds_half_up():
     featureScores = {featureId: 0.845 for featureId in FEATURE_IDS}
     assert compute_legibility_score(featureScores)[0] == 85     # 84.5 -> 85, label matches the shown number
 
-
-def test_increasing_score_line():
-    assert increasing_score(20.0, 30.0, 85.0) == 0.0
-    assert increasing_score(57.5, 30.0, 85.0) == 0.5
-    assert increasing_score(90.0, 30.0, 85.0) == 1.0
-    assert increasing_score(None, 30.0, 85.0) is None
-    assert score_measurement("ocrConfidencePct", 57.5) == 0.5
-
-
-def test_unavailable_ocr_leaves_the_other_features_sharing_the_weight():
-    result = score_measurements(dict(PERFECT_MEASUREMENTS, ocrConfidencePct=None))
-    assert result["missingFeatureIds"] == ["ocrReadability"]
-    assert result["featureScores"]["ocrReadability"] is None
-    assert len(result["featureWeights"]) == 8 and abs(sum(result["featureWeights"].values()) - 1) < 1e-9
-    assert result["legibilityScore"] == 100
