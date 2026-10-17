@@ -5,7 +5,7 @@ POST /api/analyze calls read_handwriting(); its confidence becomes the ocrConfid
 can't load, read_handwriting() returns None and the feature is simply left out of the score.
 
 Run on its own from the backend/ folder:
-    python -m app.accuracy_evaluation [image path]     (default: data/image0(37).heic at the project root)
+    python -m app.accuracy_evaluation <image path>     (e.g. a photo in tests/sample-images/)
 The first run downloads the EasyOCR model, so it needs internet access.
 HEIC photos (iPhone) need:  pip install pillow-heif
 """
@@ -23,10 +23,6 @@ from .image_pipeline import load_image, to_grayscale, resize_to_width
 from .scoring_config import OCR_ENABLED, OCR_LANGUAGES
 
 logger = logging.getLogger(__name__)
-
-# Found from this file's location, so it works from any folder
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_IMAGE_PATH = str(PROJECT_ROOT / "data" / "image0(37).heic")
 
 
 # STEP 7A: Load the pretrained English OCR model.
@@ -184,4 +180,6 @@ def main(path):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_IMAGE_PATH)
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python -m app.accuracy_evaluation <image path>")
+    main(sys.argv[1])

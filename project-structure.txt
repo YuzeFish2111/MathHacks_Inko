@@ -12,7 +12,6 @@ MathHacks_Project/
 |-- [x] project-structure.txt            this file
 |-- [x] instructions.txt                 how users should take their handwriting photos
 |-- [x] URGENT-TODO.md                   blockers before the next step, with owners
-|-- data/                                real test photos from the team (PUBLIC on GitHub; see note below)
 |
 |-- backend/                             Python + FastAPI + OpenCV
 |   |-- [x] requirements.txt             numpy, opencv-python-headless, scipy, fastapi,
@@ -108,7 +107,7 @@ Contract coverage
                             BLUR_TOO_HIGH, CONTRAST_TOO_LOW, PAGE_NOT_FOUND, NOT_ENOUGH_WRITING,
                             SEGMENTATION_UNCERTAIN
 
-Real-photo findings (data/, 5 photos)
+Real-photo findings (5 early team photos, since removed from the repo)
   - None followed the photo instructions (no page edges visible), so mm sizes were inflated and every
     score was "Hard to read" (35-48): artefacts of the photos, not the handwriting.
   - skibidi.jpeg is rotated 90 degrees; deskew only handles +/-15 degrees, so it measured sideways text.
@@ -126,8 +125,9 @@ Remaining backend work
   [ ] Optional: letter-level work (x-height consistency, comparison to an ideal example)
 
 Notes
-  - data/ is committed to a public GitHub repo; move any handwriting that isn't the team's own to
-    validation/samples/ (git-ignored) and get consent first.
+  - The early photos in data/ were removed from the repo. They remain in git history; if any weren't
+    the team's own handwriting, the history needs rewriting (e.g. git filter-repo) and a force-push.
+  - New test photos: tests/sample-images/ (team's own). Consented study photos: validation/samples/ (git-ignored).
 
 
 FILE SUMMARIES
@@ -143,7 +143,6 @@ Root
                                  lighting, framing) and what each "retake" message means.
   project-structure.txt          This file: folder map, backend progress tracker, file summaries.
   .gitignore                     Keeps caches, secrets and private validation photos out of git.
-  data/                          The team's first real test photos (public on GitHub).
 
 backend/app/  (the API; every request goes main.py -> image_pipeline -> measurements -> scoring
                -> advice / issues -> schemas)

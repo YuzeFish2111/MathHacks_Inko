@@ -28,7 +28,7 @@ Recommendation: build Option A first, add B if time allows.
 
 | # | Task | Why | Owner |
 |---|------|-----|-------|
-| 6 | **Check the photos in `data/` are the team's own handwriting**, or remove them. They are public on GitHub. Anything from outside the team needs consent and belongs in `validation/samples/` (git-ignored). Deleting a file doesn't remove it from git history. | Privacy: the plan requires consent for samples. | |
+| 6 | **Photos in `data/` were removed from the repo**, but they are still in git history. If any weren't the team's own handwriting, rewrite the history (`git filter-repo --path data --invert-paths`) and force-push; everyone then re-clones. New consented samples go in `validation/samples/` (git-ignored). | Privacy: the plan requires consent for samples. | |
 | 7 | **Start collecting validation ratings**: 30-60 samples, each rated 1-10 by 3+ people who haven't seen the app's score (`validation/ratings.csv`). | Takes the longest, because it needs other people's time. Without it we can't say how well the score matches human judgement. | |
 | 8 | **Feature-bar ideal ranges for the frontend**: the API doesn't send them. Copy them into the frontend (see `frontend/README.md`, step 9) or add them to the API response. | The results screen must show "your value vs. the ideal range". | |
 | 9 | **Re-check scores once OCR runs for real**: EasyOCR may "read" messy writing correctly because the pangram is famous, which makes its confidence too high. Compare a messy and a neat sample. | Decides whether OCR deserves its 1/9 weight. | |
