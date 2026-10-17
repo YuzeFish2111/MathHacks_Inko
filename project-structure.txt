@@ -76,6 +76,7 @@ MathHacks_Project/
 |   `-- sample-images/                   hard cases collected during testing
 |
 `-- validation/
+    |-- [x] WEIGHT_FITTING_GUIDE.md      step-by-step guide: ratings -> ICC -> weight regression -> test-set report
     |-- samples/                         consented validation images (NOT public; git-ignored)
     |-- [~] ratings.csv                  header only: sampleId, raterId, rating, readingAccuracyPct
     `-- [ ] analysis.ipynb               ICC, correlation, bootstrap, regression results
@@ -212,5 +213,6 @@ shared/
   fixtures/*.json        Example "complete" and "needs_better_photo" responses both sides test against.
 
 validation/  (for checking the score against people; not started)
+  WEIGHT_FITTING_GUIDE.md How to collect blind ratings, check rater agreement, fit the weights and report.
   ratings.csv            Blind human ratings, one row per sample per rater (header only so far).
   analysis.ipynb         Will hold rater agreement (ICC), correlation with the app's score, weight fitting.
