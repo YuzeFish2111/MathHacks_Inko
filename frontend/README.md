@@ -109,7 +109,7 @@ Suggested new folders and files (match these names so teammates can find things)
 src/
   App.tsx                      screen switching (step 5)
   api/analyze.ts               the API call (step 6)
-  constants/featureInfo.ts     labels, units, ideal ranges (step 9)
+  constants/featureInfo.ts     labels, units, ideal ranges, curve parameters (step 9)
   mocks/mockResponses.ts       fixtures for building without the backend (step 5)
   pages/LandingPage.tsx
   pages/CapturePage.tsx
@@ -120,6 +120,14 @@ src/
   components/OverlayCanvas.tsx
   components/FeatureBars.tsx
   components/AdviceList.tsx
+  utils/scoringModel.ts        the scoring maths in TypeScript, for the maths features (step 12)
+  utils/robustStats.ts         median, least squares, Theil-Sen, CV (step 12)
+  components/ScoreEquation.tsx       "Show the maths" score breakdown (step 12A)
+  components/CurveChart.tsx          each feature's scoring curve with the user's point (step 12B)
+  components/WhatIfSimulator.tsx     sliders that recompute the score live (step 12C)
+  components/BaselineFitPanel.tsx    least squares vs Theil-Sen on the user's letters (step 12D)
+  components/DistributionChart.tsx   histograms of gaps and letter heights (step 12E)
+  pages/HowItWorksPage.tsx           the maths of each pipeline stage (step 12F)
 ```
 
 ---
@@ -266,19 +274,24 @@ Show, top to bottom:
 
 ### Feature labels, units and ideal ranges (`src/constants/featureInfo.ts`)
 
-The API doesn't send ideal ranges, so copy them from `backend/app/scoring_config.py`. If someone
-changes that file, update this table and the constants file together.
+The API doesn't send ideal ranges or curve parameters, so copy them from
+`backend/app/scoring_config.py` (`SWEET_SPOT_CURVES`, `DECREASING_CURVES`, `FEATURE_WEIGHTS`). If someone
+changes that file, update this table and the constants file together (or see step 12G, which removes
+the need to copy).
 
-| featureId | Label | Measurement | Unit | Ideal |
-|---|---|---|---|---|
-| `textSize` | Letter size | `textSizeMm` | mm | 3.0-7.0 |
-| `xHeight` | Small-letter height | `xHeightMm` | mm | 2.0-4.5 |
-| `baselineConsistency` | Staying on the line | `baselineVariationMm` | mm | 0.3 or less |
-| `shapeConsistency` | Consistent slant | `slantStdDeg` | degrees | 2 or less |
-| `strokeContrast` | Even pen pressure | `strokeContrastRatio` | x (ratio) | 1.2 or less |
-| `strokeWeight` | Pen thickness | `strokeWidthMedianMm` | mm | 0.3-0.8 |
-| `letterSpacing` | Space between letters | `relativeLetterSpacing` | x letter height | 0.15-0.6 |
-| `spacingConsistency` | Even spacing | `letterSpacingCv` | % variation (x 100) | 15% or less |
+| featureId | Label | Measurement | Unit | Ideal | Curve and parameters |
+|---|---|---|---|---|---|
+| `textSize` | Letter size | `textSizeMm` | mm | 3.0-7.0 | sweet-spot (1.5, 3.0, 7.0, 12.0) |
+| `xHeight` | Small-letter height | `xHeightMm` | mm | 2.0-4.5 | sweet-spot (1.0, 2.0, 4.5, 8.0) |
+| `baselineConsistency` | Staying on the line | `baselineVariationMm` | mm | 0.3 or less | decreasing (0.3, 2.5) |
+| `shapeConsistency` | Consistent slant | `slantStdDeg` | degrees | 2 or less | decreasing (2.0, 20.0) |
+| `strokeContrast` | Even pen pressure | `strokeContrastRatio` | x (ratio) | 1.2 or less | decreasing (1.2, 4.0) |
+| `strokeWeight` | Pen thickness | `strokeWidthMedianMm` | mm | 0.3-0.8 | sweet-spot (0.1, 0.3, 0.8, 1.5) |
+| `letterSpacing` | Space between letters | `relativeLetterSpacing` | x letter height | 0.15-0.6 | sweet-spot (0.0, 0.15, 0.6, 1.2) |
+| `spacingConsistency` | Even spacing | `letterSpacingCv` | % variation (x 100) | 15% or less | decreasing (0.15, 1.0) |
+
+All eight features currently weigh 1/8. Sweet-spot (a, b, c, d): 0 outside a..d, rising a->b, 1 from
+b to c, falling c->d. Decreasing (v0, v1): 1 at or below v0, falling in a straight line to 0 at v1.
 
 ### Overlay canvas (`src/components/OverlayCanvas.tsx`)
 
@@ -321,7 +334,184 @@ show a fake percentage.
 
 ---
 
-## Step 12: Test on a real phone
+## Step 12: Make the maths visible
+
+This is a maths-themed hackathon, so the results should show *how* the score was calculated, not just
+the answer. Each idea below is a self-contained component; build them in order of value. Put them
+behind a **"Show the maths"** toggle (or tab) on the results screen so the main view stays simple.
+
+**Tools:** draw charts as plain **SVG** in React (small, no dependency, full control over labels), or use
+a chart library if the team prefers. Render formulas with **KaTeX** (`npm install katex`, then
+`katex.renderToString("...")`), so they look like real maths, not code.
+
+**Ground rules for these features:**
+- Every number shown must come from the response or from the documented model, never invented.
+- Label everything that isn't validated as an experimental estimate.
+- Keep text short: one formula plus one plain-English sentence per idea.
+
+### Shared code: the scoring model in TypeScript (`src/utils/scoringModel.ts`)
+
+Several features recompute scores in the browser. Port the backend's maths exactly:
+
+```ts
+import type { FeatureId } from "../types/analysis";
+
+export type Curve =
+  | { kind: "sweetSpot"; a: number; b: number; c: number; d: number }
+  | { kind: "decreasing"; v0: number; v1: number };
+
+/** Same as backend/app/scoring.py: a 0-1 score for one measurement, or null if unknown. */
+export function scoreOnCurve(value: number | null, curve: Curve): number | null {
+  if (value === null || !Number.isFinite(value)) return null;
+  if (curve.kind === "decreasing") {
+    const { v0, v1 } = curve;
+    if (value <= v0) return 1;
+    if (value >= v1) return 0;
+    return (v1 - value) / (v1 - v0);
+  }
+  const { a, b, c, d } = curve;
+  if (value <= a || value >= d) return 0;
+  if (value >= b && value <= c) return 1;
+  return value < b ? (value - a) / (b - a) : (d - value) / (d - c);
+}
+
+/** Weighted mean over available features only, rescaled; rounded half up like the backend. */
+export function legibilityScore(scores: Partial<Record<FeatureId, number | null>>,
+                                weights: Record<FeatureId, number>): number | null {
+  let weightedSum = 0, weightTotal = 0;
+  for (const [featureId, score] of Object.entries(scores) as [FeatureId, number | null][]) {
+    if (score === null || score === undefined) continue;
+    weightedSum += weights[featureId] * score;
+    weightTotal += weights[featureId];
+  }
+  return weightTotal > 0 ? Math.floor((100 * weightedSum) / weightTotal + 0.5) : null;
+}
+```
+
+**Consistency check (do this first):** with the mock response, `legibilityScore(featureScores, weights)`
+must equal the response's `legibilityScore`, and `scoreOnCurve(measurement, curve)` must equal each
+`featureScores` value (to about 0.001). If not, the TypeScript copy has drifted from the backend.
+
+### Build now: these need only the current API response
+
+**12A. "Show the maths" score breakdown** (`ScoreEquation.tsx`). *Highest value; build first.*
+- Show the formula with the user's own numbers:
+  `score = 100 × (⅛·0.86 + ⅛·0.93 + ⅛·0.72 + …) = 78`, using `featureScores` and `featureWeights`.
+- Under it, a **stacked bar** of each feature's contribution `100 × wₖ × fₖ`, so the segments add up
+  to the score, plus the "lost points" `100 × wₖ × (1 − fₖ)` greyed out.
+- If `missingFeatureIds` isn't empty, explain the rescaling in one line: "*Pen thickness couldn't be
+  measured, so the other 7 features share its weight (1/7 each).*"
+
+**12B. Scoring-curve chart per feature** (`CurveChart.tsx`).
+- When a feature bar is tapped, show its curve (the trapezoid or the falling line) as an SVG graph:
+  measurement on the x-axis, 0-1 score on the y-axis, the ideal zone shaded.
+- Mark the user's measurement as a dot on the curve, with a dashed line down to the x-axis and across
+  to the y-axis, labelled e.g. "your x-height: 3.1 mm → score 0.93".
+- Show the piecewise formula next to it (KaTeX), e.g. for decreasing curves
+  `f(m) = (v₁ − m) / (v₁ − v₀)`, clipped to [0, 1].
+
+**12C. "What if" simulator** (`WhatIfSimulator.tsx`).
+- One slider per measurement, starting at the user's value. Moving a slider recomputes that feature's
+  score with `scoreOnCurve` and the total with `legibilityScore`, live.
+- Show the **biggest lever**: for each feature, the points gained by reaching the ideal range,
+  `100 × wₖ × (1 − fₖ)`, sorted. "*Fixing your letter spacing would add up to 4 points.*" This is the
+  same order as the tips, so it explains *why* those tips were chosen.
+- Label it clearly as a model simulation ("what the model would say"), not a prediction of a new photo.
+
+**12D. Robust statistics demo: baseline fit** (`BaselineFitPanel.tsx`).
+- From `overlayData.components`, take each box's bottom (`yPx + heightPx`) and centre
+  (`xPx + widthPx / 2`) for one line. Fit two lines in the browser and draw both over the image:
+  - **least squares** (the usual straight-line fit), and
+  - **Theil-Sen** (the median of all pairwise slopes), which is what the backend uses.
+- The i-dots, punctuation and descenders (g, j, p, q, y) are natural outliers. Show how least squares
+  is pulled toward them while Theil-Sen isn't. Optional: let the user **drag one point** and watch the
+  two lines react.
+- Draw short vertical "residual" lines from each letter's bottom to the Theil-Sen baseline, with the
+  formula for the spread, `1.4826 × median(|residual − median(residual)|)`.
+
+```ts
+// src/utils/robustStats.ts
+export const median = (values: number[]) => {
+  const sorted = [...values].sort((p, q) => p - q), mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+/** Theil-Sen: slope = median of pairwise slopes; intercept = median(y) - slope * median(x).
+ *  This is the same intercept rule as SciPy's theilslopes, which the backend uses. */
+export function theilSen(xs: number[], ys: number[]) {
+  const slopes: number[] = [];
+  for (let i = 0; i < xs.length; i++)
+    for (let j = i + 1; j < xs.length; j++)
+      if (xs[j] !== xs[i]) slopes.push((ys[j] - ys[i]) / (xs[j] - xs[i]));
+  const slope = median(slopes);
+  return { slope, intercept: median(ys) - slope * median(xs) };
+}
+
+/** Ordinary least squares, for comparison. */
+export function leastSquares(xs: number[], ys: number[]) {
+  const meanX = xs.reduce((s, x) => s + x, 0) / xs.length, meanY = ys.reduce((s, y) => s + y, 0) / ys.length;
+  let covariance = 0, variance = 0;
+  xs.forEach((x, i) => { covariance += (x - meanX) * (ys[i] - meanY); variance += (x - meanX) ** 2; });
+  const slope = variance ? covariance / variance : 0;
+  return { slope, intercept: meanY - slope * meanX };
+}
+```
+
+The browser's Theil-Sen line won't match the backend's baseline exactly: the response doesn't say which
+boxes are letters, marks or clusters, and the backend uses letters only. Say so in a caption, or ask for
+the component kind (see 12G).
+
+**12E. Distributions: gaps and letter heights** (`DistributionChart.tsx`).
+- **Gaps:** a histogram of `overlayData.gaps[].widthPx`, coloured and patterned by `kind` (letter vs word).
+  Draw the median letter gap and the word-gap threshold (2.5 × the line's median gap) as vertical lines,
+  so users see *how* the app decided which gaps are spaces between words.
+- Show the coefficient of variation with its formula, `CV = σ / μ`, next to `letterSpacingCv`.
+- **Letter heights:** a histogram of `components[].heightPx` with the median marked. The clusters of
+  short (x-height) letters and tall (ascender) letters show why the app uses the median, not the mean.
+
+**12F. "How it works" page** (`HowItWorksPage.tsx`, linked from the landing page).
+One card per pipeline stage: a one-sentence explanation, the formula (KaTeX), and a small picture
+(use the user's own image where possible, or the sample image):
+
+| Card | Formula to show |
+|---|---|
+| Flattening the page | a homography: 4 corner pairs give the 8 equations for a 3×3 matrix H |
+| Real-world scale | mm per pixel = paper width in mm ÷ page width in px |
+| Removing shadows | I = R × L, so R = I ÷ L (the lighting L is estimated by a morphological closing) |
+| Straightening | θ* = argmax over θ of Var(ink per row after rotating by θ) |
+| Ink vs paper | a pixel is ink if it is more than C darker than its neighbourhood's weighted mean |
+| Robust baseline | Theil-Sen slope = median of pairwise slopes; spread = 1.4826 × MAD |
+| Slant | θ = atan(μ₁₁ / μ₀₂) from image moments |
+| Stroke width | distance transform: width ≈ 2d − 1 at a stroke's centre |
+| Scoring | trapezoid and linear curves, then a weighted mean over the measured features |
+| Honest uncertainty | missing features are left out, not counted as 0; the score isn't validated yet |
+
+The maths for every card is described in `backend/README.md` (sections 5 and 7) and in the docstrings
+of `backend/app/image_pipeline.py` and `measurements.py`.
+
+**Honesty panel.** Somewhere visible (results footer or the "How it works" page): "*This is an
+experimental estimate. We plan to compare it with blind human ratings using rater agreement (ICC) and
+rank correlation (Spearman).*" Replace with the real numbers once `validation/` has them.
+
+### 12G. Needs backend data first (ask the backend person; contract change)
+
+These need new fields or endpoints. Agree them first, then update `shared/analysis-contract.md`,
+`schemas.py` and `analysis.ts` together (see "Ground rules"). Don't fake the data meanwhile.
+
+| Feature | Backend addition needed | Why it's worth it |
+|---|---|---|
+| Curves and weights without copying | `GET /api/scoring-model` returning curves, weights, score bands and issue thresholds | removes the copied table in step 9, so the frontend can never drift from the backend |
+| "How the computer sees it" stepper | optional image stages (lighting estimate, corrected page, ink mask) as data URLs, e.g. only when `includeDebugImages=true` | the most visual maths demo: each pipeline step on the user's own photo |
+| Straightening chart | `deskewAngleDeg` plus the variance at each tried angle, and the ink-per-row profile | shows the optimisation itself: a curve with a clear peak at the chosen angle |
+| Slant needles | each letter's slant angle (and `kind`: letter / mark / cluster) on `components` | draw a small slant line in every box, plus a histogram of slants |
+| Flattening animation | the detected `cornerPointsPx` (or a `POST /api/detect-page` endpoint) | morph the photo into the flat page, showing the perspective correction |
+
+Recommended order: `GET /api/scoring-model` first (it also fixes the copied-constants problem), then
+debug images, then the deskew chart.
+
+---
+
+## Step 13: Test on a real phone
 
 1. Start the backend as usual (step 1).
 2. Start the frontend so other devices can reach it: `npm run dev -- --host`
@@ -341,6 +531,10 @@ a slow connection (Chrome DevTools > Network > "Slow 4G"), and what happens when
 - [ ] Feature bars are weakest-first with raw value, unit and ideal range.
 - [ ] Every result can be traced back to a mark on the image or a measurement.
 - [ ] Nothing relies on colour alone, and the score is labelled as an experimental estimate.
+- [ ] "Show the maths": the score breakdown (12A) and the curve charts (12B) work, and the TypeScript
+      scoring model reproduces the response's scores (consistency check in step 12).
+- [ ] The "How it works" page (12F) explains every pipeline stage with its formula.
+- [ ] Every number in the maths features comes from the response or the documented model.
 
 ## Where to ask
 
