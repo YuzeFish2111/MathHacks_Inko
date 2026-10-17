@@ -1,0 +1,55 @@
+HOW TO TAKE YOUR HANDWRITING PHOTO
+
+Writing the sample
+1. Use plain white paper. Avoid lined, squared or coloured paper; the
+   printed lines can be mistaken for writing. A4 is the default size.
+   If your paper is a different size, enter its real width and height
+   in millimetres.
+2. Use a dark pen (black or dark blue). A pencil is fine if it's dark.
+   Avoid light pencil, coloured or metallic ink, and felt pens that bleed.
+3. Write this sentence, exactly as shown:
+   The quick brown fox jumps over the lazy dog.
+4. Write in print (separate letters), not joined-up cursive. Leave
+   small gaps between letters and clear gaps between words.
+5. Write at your normal size and in your normal style. Don't try to be
+   extra neat; the app is measuring how you usually write.
+6. Leave a clear margin of blank paper around the writing, and don't
+   add anything else to the page (no drawings, names or crossings-out).
+
+Setting up
+7. Put the paper flat on a table. Smooth out folds and curled corners.
+8. Choose a table that is darker than the paper (wood or a dark cloth
+   works well), so the app can find the edges of the page.
+9. Find even, bright light, such as daylight from a window or a room
+   with ceiling lights on. Don't let your phone, hand or head cast a
+   shadow on the page.
+10. Turn the flash off. It causes glare and bright spots.
+
+Taking the photo
+11. Hold the phone directly above the page, screen parallel to the
+    paper, not at an angle.
+12. Fit the whole page in the photo with a little table showing on all
+    four sides. Don't cut off any corner.
+13. The page should fill most of the photo. Move closer rather than
+    using zoom.
+14. Tap the writing on screen to focus, then hold the phone still and
+    take the photo.
+15. Check the photo before sending: the writing should be sharp when
+    you zoom in, with no blur, shadows or glare.
+16. Send the original photo. Don't crop, filter, edit or add stickers.
+    JPEG or PNG works best. On an iPhone, if the upload fails, go to
+    Settings > Camera > Formats and choose "Most Compatible".
+
+If the app asks for a better photo
+- "Blurry": hold the phone steadier, or rest your elbows on the table.
+- "Too faint": use a darker pen or brighter light.
+- "Not enough writing": make sure the whole sentence is in the photo.
+- "Couldn't separate the letters": write in print with small gaps
+  between letters.
+- "Page edges weren't found": use a darker table and show all four
+  corners, or drag the corners into place on the preview screen.
+
+Your privacy
+- Your photo is analysed and then discarded; the app does not store it.
+- If you're giving a sample for the team's research, you'll be asked
+  for permission first, and your handwriting won't be made public.
