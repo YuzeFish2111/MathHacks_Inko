@@ -4,6 +4,7 @@ import { h, openDialog } from "./ui.js";
 import { openSettings } from "./components/settings.js";
 import { initAccount } from "./components/account.js";
 import { initInstall } from "./components/install.js";
+import { initViewportFix } from "./viewport.js";
 import * as home from "./pages/home.js";
 import * as decoder from "./pages/decoder.js";
 import * as practice from "./pages/practice.js";
@@ -17,6 +18,7 @@ const mounted = new Set();
 let currentPage = null;
 
 applyTheme();
+initViewportFix();
 
 function fillIcons(root = document) {
   root.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = icons[el.dataset.icon] || ""; });

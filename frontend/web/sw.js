@@ -1,7 +1,7 @@
 // Inko service worker. App files: network first (so updates show right away), with the
 // cached copy as the offline fallback. Fonts, icons, and images: cache first.
 // Analysis and account requests always go to the network and are never cached.
-const CACHE = "inko-v7";   // bump when app files change shape (v2: analysis backend results; v3: whole-page flag; v4: maths panel; v5: Jev removed; v6: drawing hint, drawing flag; v7: "Contact Us")
+const CACHE = "inko-v8";   // bump when app files change shape (v2: analysis backend results; v3: whole-page flag; v4: maths panel; v5: Jev removed; v6: drawing hint, drawing flag; v7: "Contact Us"; v8: iOS tab bar fix)
 const SHELL = [
   "/", "/index.html", "/manifest.json", "/css/styles.css", "/js/app.js",
   "/fonts/figtree.woff2", "/fonts/figtree-italic.woff2",
