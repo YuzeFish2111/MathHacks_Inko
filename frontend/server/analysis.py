@@ -54,12 +54,19 @@ def whole_image_corners(widthPx: int, heightPx: int) -> str:
     return json.dumps([[0, 0], [widthPx, 0], [widthPx, heightPx], [0, heightPx]])
 
 
-async def analyze(jpeg: bytes, wholePageSizePx: tuple[int, int] | None = None) -> dict:
+async def analyze(jpeg: bytes, wholePageSizePx: tuple[int, int] | None = None, drawing: bool = False) -> dict:
     """POST the photo to the backend. Returns a contract-valid AnalysisResponse (either status).
 
     wholePageSizePx: (width, height) of the JPEG when the whole image is known to be the page.
+    drawing: an on-screen drawing (isDrawing): used whole, and letter size is "Not measured",
+    because a screen isn't a page to compare letter size with.
     """
-    form = {"cornerPointsPx": whole_image_corners(*wholePageSizePx)} if wholePageSizePx else None
+    if drawing:
+        form = {"isDrawing": "true"}
+    elif wholePageSizePx:
+        form = {"cornerPointsPx": whole_image_corners(*wholePageSizePx)}
+    else:
+        form = None
     try:
         async with httpx.AsyncClient(timeout=config.ANALYSIS_TIMEOUT_S) as client:
             res = await client.post(f"{config.ANALYSIS_API_URL}/api/analyze", data=form,

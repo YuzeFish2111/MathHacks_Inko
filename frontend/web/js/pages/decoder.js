@@ -26,7 +26,7 @@ export function mount(el) {
   el.append(h("div", { class: "card decoder" }, uploadPanel, miggle.panel));
   const fromPhoto = (file) => { mode = "photo"; handleFile(file); };
   pickers = createPickers(fromPhoto);
-  drawPad = createDrawPad({ onSubmit: (file) => handleFile(file, { wholePage: true }) });
+  drawPad = createDrawPad({ onSubmit: (file) => handleFile(file, { drawing: true }) });
   setupDragAndDrop(uploadPanel, fromPhoto);
   document.addEventListener("keydown", (e) => {
     if (visible && mode === "draw" && drawPad.el.isConnected && (e.metaKey || e.ctrlKey) && e.key === "z") {
@@ -126,8 +126,9 @@ async function openSaved(id) {
   }
 }
 
-/** wholePage: the image IS the page (drawing, example), so its size can be judged without page edges. */
-async function handleFile(file, { wholePage = false } = {}) {
+/** wholePage: the image IS the page (bundled example), so its size can be judged without page edges.
+ *  drawing: on-screen writing, used whole; letter size is "Not measured" because a screen isn't a page. */
+async function handleFile(file, { wholePage = false, drawing = false } = {}) {
   if (busy || !file) return;
   busy = true;
   let prepared;
@@ -142,7 +143,7 @@ async function handleFile(file, { wholePage = false } = {}) {
   const dots = miggle.typing();
   const started = Date.now();
   try {
-    const result = await api.analyze(prepared.blob, prepared.name, { wholePage });
+    const result = await api.analyze(prepared.blob, prepared.name, { wholePage, drawing });
     await sleep(Math.max(0, MIN_LOADING_MS - (Date.now() - started)));
     dots.remove();
     await renderResult(result);
@@ -237,7 +238,7 @@ function renderResult(result) {
 const CHECK_LABELS = {
   fileType: "Photo file type", fileSize: "File size", decode: "Opens as an image", imageSize: "Big enough",
   pageBounds: "Page edges", inkAmount: "Enough writing", contrast: "Dark ink on light paper",
-  blur: "Sharp, not blurry", segmentation: "Letters clearly separate",
+  blur: "Sharp, not blurry", segmentation: "Enough separate letters",
 };
 
 function retakeActions() {

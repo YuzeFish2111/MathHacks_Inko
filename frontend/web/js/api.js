@@ -36,11 +36,13 @@ async function request(path, { method = "GET", body, json, timeout = 90000 } = {
 }
 
 export const api = {
-  /** wholePage: the whole image is the page (on-screen drawing, bundled example), not a photo of one. */
-  analyze(blob, filename = "photo.jpg", { wholePage = false } = {}) {
+  /** wholePage: the whole image is the page (bundled example), not a photo of one.
+   *  drawing: on-screen writing; used whole, and letter size is "Not measured" (a screen isn't a page). */
+  analyze(blob, filename = "photo.jpg", { wholePage = false, drawing = false } = {}) {
     const form = new FormData();
     form.append("file", blob, filename);
     if (wholePage) form.append("whole_page", "true");
+    if (drawing) form.append("drawing", "true");
     return request("/analyze", { method: "POST", body: form, timeout: 120000 });
   },
   health: () => request("/api/health", { timeout: 5000 }),
