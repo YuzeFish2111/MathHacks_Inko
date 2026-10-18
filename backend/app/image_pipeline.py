@@ -73,6 +73,7 @@ def load_image(path: str) -> np.ndarray:
 def decode_image(imageBytes: bytes) -> np.ndarray:
     buffer = np.frombuffer(imageBytes, dtype=np.uint8)
     originalImage = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+    # If OpenCV can't decode it (e.g. HEIC), try Pillow with the HEIF plugin
 
     if originalImage is None:
         try:
@@ -82,7 +83,7 @@ def decode_image(imageBytes: bytes) -> np.ndarray:
 
     return originalImage
 
-
+#crops out the useless stuff outside the image
 def crop_page(originalImage: np.ndarray, cornerPointsPx: list[tuple[float, float]],
               targetWidthPx: int = TARGET_IMAGE_WIDTH_PX) -> np.ndarray:
     """Cut the page out of the photo (rectifiedImage) WITHOUT reshaping it.
@@ -169,7 +170,7 @@ def _candidate_page_masks(grayscaleImage: np.ndarray):
     edges = cv2.Canny(blurredImage, 0.66 * medianLevel, 1.33 * medianLevel)
     yield cv2.dilate(edges, np.ones((5, 5), np.uint8))
 
-
+#checks if a region of the image looks like paper
 def _looks_like_page(corners: np.ndarray, grayscaleImage: np.ndarray) -> bool:
     """Size, shape and brightness checks that reject desks, books and blocks of text."""
     imageAreaPx = grayscaleImage.shape[0] * grayscaleImage.shape[1]
