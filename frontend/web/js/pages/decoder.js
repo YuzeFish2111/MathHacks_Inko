@@ -6,6 +6,7 @@ import { openAuth } from "../components/account.js";
 import { createMiggle } from "../components/miggle.js";
 import { createPickers, exampleFile, prepareImage } from "../components/upload.js";
 import { factorLabel, scoreCard } from "../components/results.js";
+import { mathPanel } from "../components/mathpanel.js";
 import { loadScoringModel, PAGE_WIDE_FEATURES } from "../features.js";
 import { buildMessages } from "../components/feedback.js";
 import { createHighlights } from "../components/highlights.js";
@@ -357,6 +358,7 @@ async function showResult(result) {
 
   const items = [
     { content: scoreCard(result, { model, onPick: (id) => pick(id, "meter"), refs }), opts: { wide: true, cls: "flush" } },
+    ...[mathPanel(result, model)].filter(Boolean).map((content) => ({ content, opts: { wide: true, cls: "flush" } })),
     ...buildMessages(result, { onPick: (id) => pick(id, "tip"), refs, highlights }),
   ];
   if (!state.user) {

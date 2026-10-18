@@ -89,6 +89,23 @@ the `qualityChecks` list, and a "Take another photo" button. Nothing is saved.
 from the backend. `GET /api/health` reports whether the backend answers and whether its
 `schemaVersion` matches.
 
+## "Show the maths" (results screen)
+
+A card after the score (`web/js/components/mathpanel.js`, maths in `web/js/maths.js`) with three sections:
+
+- **Score breakdown:** the weighted-average formula with the person's own numbers
+  (`100 × (1/8 × 0.51 + …) = 78.4 → 78`), a stacked bar of points earned and lost per feature, and
+  a note when a missing feature's weight is shared out.
+- **What if…?:** a slider per measurement that recomputes the score live, plus the "biggest levers"
+  (`100 × weight × (1 − score)`, the points each feature could add).
+- **Robust statistics:** the letter bottoms of one line with a least-squares line and the Theil-Sen
+  line the backend uses; drag a dot (or press "Drop the last letter below the line") to see least
+  squares swing while Theil-Sen barely moves.
+
+`maths.js` is a port of `backend/app/scoring.py`, using the curves and weights from
+`GET /api/scoring-model`. It was checked against the Python backend on 300 random measurement sets
+and 50 Theil-Sen fits (identical scores, labels and fits); keep the two in step if scoring changes.
+
 ## Rules carried over from the frontend guide
 
 These come from `IMPORTANT_READS.md` and the contract, and the code follows them:
