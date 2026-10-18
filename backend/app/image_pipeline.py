@@ -374,7 +374,7 @@ def deskew(grayscaleImage: np.ndarray) -> tuple[np.ndarray, float]:
     # the adaptive threshold would mistake for an edge of ink
     return rotate_image(grayscaleImage, deskewAngleDeg, borderMode=cv2.BORDER_REPLICATE), deskewAngleDeg
 
-
+#group the ink pixels into bands of writing (discard if too short)
 def compute_ink_mask(originalImage: np.ndarray) -> tuple[np.ndarray, float]:
     """Full chain: grayscale -> resize -> lighting correction -> deskew -> threshold -> denoise.
 
