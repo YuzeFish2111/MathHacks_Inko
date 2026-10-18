@@ -195,6 +195,7 @@ def detect_page_corners(originalImage: np.ndarray) -> Optional[list[tuple[float,
     smallImage = cv2.resize(originalImage, None, fx=shrinkFactor, fy=shrinkFactor, interpolation=cv2.INTER_AREA)
     smallGrayscale = to_grayscale(smallImage)
 
+    #converts rgb to grayscale and resize to target width (1000)
     for pageMask in _candidate_page_masks(smallGrayscale):
         contours, _ = cv2.findContours(pageMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:5]:    # biggest outlines first
