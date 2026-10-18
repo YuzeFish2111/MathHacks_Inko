@@ -1,0 +1,21 @@
+# Web server
+fastapi==0.143.3
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+httpx==0.28.1                    # forwards photos to the analysis backend (backend/)
+
+# Image handling before the photo goes to the analysis backend (HEIC, EXIF, tilt check).
+# Headless OpenCV, the same flavour as backend/, so the two never clash in one environment.
+numpy==2.2.6
+opencv-python-headless==4.14.0.94
+pillow==12.3.0
+pillow-heif==1.8.1
+
+# Terminal QR code for opening the app on a phone
+qrcode==8.2
+
+# Optional Jev (TypeSafe) photo checks
+typesafe-sdk==0.7.5
+
+# Tests
+pytest==9.1.1

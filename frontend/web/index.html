@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Inko</title>
+  <meta name="description" content="Inko scores your handwriting, highlights hard-to-read letters, and gives you practice to improve.">
+  <meta name="theme-color" content="#f8f4e8">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Inko">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="preload" href="fonts/figtree.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/styles.css">
+  <script>
+    // Apply the saved theme before first paint so there is no flash.
+    try { var t = localStorage.getItem("inko-theme"); if (t === "milk" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <button class="icon-tile account-tile mobile-only" id="account-mobile" type="button" aria-label="Sign in"></button>
+    <a class="brand" href="#/" aria-label="Inko home">
+      <img class="brand-mark" src="img/logo-mark.png" alt="" width="64" height="64">
+      <span class="brand-word" aria-hidden="true"></span>
+    </a>
+    <nav class="topnav desktop-only" aria-label="Main">
+      <a class="pill" href="#/" data-route="home">Home</a>
+      <a class="pill" href="#/decoder" data-route="decoder">Decoder</a>
+      <a class="pill" href="#/practice" data-route="practice">Practice</a>
+      <a class="pill" href="#/progress" data-route="progress">Progress</a>
+      <a class="pill" href="#/about" data-route="about">About Us</a>
+      <a class="pill" href="#/contact" data-route="contact">Contact</a>
+    </nav>
+    <div class="top-actions">
+      <button class="signin-btn desktop-only" id="account-desktop" type="button">Sign In</button>
+      <button class="icon-tile gear-tile" id="settings-btn" type="button" aria-label="Settings"></button>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="page" data-page="home" hidden></section>
+    <section class="page" data-page="decoder" hidden></section>
+    <section class="page" data-page="practice" hidden></section>
+    <section class="page" data-page="progress" hidden></section>
+    <section class="page" data-page="about" hidden></section>
+    <section class="page" data-page="contact" hidden></section>
+  </main>
+
+  <nav class="tabbar mobile-only" aria-label="Main">
+    <a class="tab" href="#/" data-route="home"><span class="icon-tile" data-icon="home"></span><span class="tab-label">Home</span></a>
+    <a class="tab" href="#/decoder" data-route="decoder"><span class="icon-tile" data-icon="decoder"></span><span class="tab-label">Decoder</span></a>
+    <a class="tab" href="#/practice" data-route="practice"><span class="icon-tile" data-icon="practice"></span><span class="tab-label">Practice</span></a>
+    <a class="tab" href="#/progress" data-route="progress"><span class="icon-tile" data-icon="progress"></span><span class="tab-label">Progress</span></a>
+    <button class="tab" type="button" id="more-btn"><span class="icon-tile" data-icon="more"></span><span class="tab-label">More</span></button>
+  </nav>
+
+  <div class="toast-host" aria-live="polite"></div>
+  <div id="print-area" class="print-only"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

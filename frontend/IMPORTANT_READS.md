@@ -1,5 +1,12 @@
 # Frontend guide: MathHacks Handwriting Legibility
 
+> **Update: the frontend is now Inko** (plain HTML/CSS/JS, no React or Vite). Start it with
+> `python3 run.py` in `frontend/`, next to the backend; see `README.md`. Steps 2-3 (Vite setup and
+> proxy) and the React file names in steps 4-8 no longer apply. The ground rules, the results and
+> retake screen requirements, and step 12 still do. The feature table in step 9 is from schema 1.4
+> (mm); the backend now sends ratios (schema 2.1), and Inko reads the curves from
+> `backend/app/scoring_config.py` instead of copying them.
+
 Step-by-step instructions for building the React app. The backend is finished enough to build against:
 `POST /api/analyze` takes a photo and returns a score, overlays and tips.
 
