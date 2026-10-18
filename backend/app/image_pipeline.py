@@ -269,9 +269,11 @@ def remove_small_components(inkMask: np.ndarray, minAreaPx: int = MIN_COMPONENT_
     """Drop connected ink components smaller than minAreaPx (isolated noise)."""
     # Connected components: every separate blob of touching ink pixels (diagonals count, so
     # connectivity=8) gets its own number in `labels`; componentStats holds each blob's box and area
+    # separate groups of touching ink pixels
     _, labels, componentStats, _ = cv2.connectedComponentsWithStats(inkMask, connectivity=8)
     keep = componentStats[:, cv2.CC_STAT_AREA] >= minAreaPx    # one True/False per blob number
     keep[0] = False    # label 0 is the paper background
+    #keeps labels of the minimum ink area
     # keep[labels] looks up every pixel's blob number in `keep`: a True/False image in one step, no loop
     return np.where(keep[labels], 255, 0).astype(np.uint8)
 
@@ -299,6 +301,7 @@ def measure_edge_sharpness(grayscaleImage: np.ndarray, inkMask: np.ndarray,
     """
     if not inkContrast or inkContrast <= 0:
         return None
+    # 
     imageFloat = grayscaleImage.astype(np.float32)
     # Sobel / 8 = brightness change per pixel (central difference, smoothed across 3 rows)
     gradientX = cv2.Sobel(imageFloat, cv2.CV_32F, 1, 0, ksize=3) / 8
