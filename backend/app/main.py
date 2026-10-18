@@ -18,7 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from .accuracy_evaluation import read_handwriting
 from .advice import generate_advice
 from .issues import find_component_issues, find_gap_issues
-from .image_pipeline import (decode_image, detect_page_corners, rectify_page, to_grayscale, resize_to_width,
+from .image_pipeline import (decode_image, detect_page_corners, crop_page, to_grayscale, resize_to_width,
                              normalize_illumination, deskew,
                              threshold_ink, remove_small_components, find_text_lines, find_components,
                              measure_ink_contrast, measure_edge_sharpness)
@@ -128,7 +128,7 @@ async def read_and_check_upload(imageFile: UploadFile, qualityChecks: list[dict]
     return originalImage
 
 
-# ---------- 5. Page geometry: straighten the page independently of physical dimensions ----------
+# ---------- 5. Page geometry: crop to the page (no reshaping) and straighten the writing ----------
 
 def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
                  qualityChecks: list[dict], warnings: list[str]):
@@ -139,7 +139,7 @@ def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
 
     if cornerPointsPx is not None:
         try:
-            pageImage = rectify_page(originalImage, cornerPointsPx)
+            pageImage = crop_page(originalImage, cornerPointsPx)
         except ValueError:
             raise PhotoProblem("PAGE_NOT_FOUND", "pageBounds",
                                "The page corners don't fit the photo. Adjust the corners and try again.")

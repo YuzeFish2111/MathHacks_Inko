@@ -27,7 +27,7 @@ MathHacks_Project/
 |   |   |-- [x] schemas.py               Pydantic request/response models
 |   |   |-- [x] scoring_config.py        feature IDs, FEATURE_SOURCES, weights, curves, score bands,
 |   |   |                                pipeline / segmentation / deskew / measurement thresholds
-|   |   |-- [x] image_pipeline.py        decode, detect_page_corners, rectify_page, grayscale, resize,
+|   |   |-- [x] image_pipeline.py        decode, detect_page_corners, crop_page, grayscale, resize,
 |   |   |                                lighting correction (backgroundEstimate -> normalizedImage), deskew,
 |   |   |                                threshold, denoise -> inkMask; contrast + edge sharpness;
 |   |   |                                LetterComponent, TextLine, find_text_lines, find_components
@@ -151,7 +151,7 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
                          Any failed check returns a friendly "needs_better_photo" message instead of a
                          misleading score. GET /api/health confirms the server is running.
   image_pipeline.py      Computer vision. Finds the page automatically (brightness or edges, then a
-                         4-corner shape check), flattens it with a perspective transform, evens out
+                         4-corner shape check), crops to it (no warping, so letters keep their shape), evens out
                          shadows (divides by an estimate of the bare paper), straightens tilted writing
                          (the angle with the sharpest row-by-row ink profile), separates ink from paper
                          (adaptive threshold), removes specks, finds text lines and letter candidates,

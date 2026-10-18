@@ -67,7 +67,7 @@ def test_complete_result_without_corners():
         assert 0 <= box["yPx"] and box["yPx"] + box["heightPx"] <= overlay["imageHeightPx"]
 
 
-def test_corners_straighten_a_page_on_a_background():
+def test_corners_crop_a_page_on_a_background():
     # Put the page on a grey desk, shifted and slightly keystoned like a real photo
     page = make_page_photo()
     photo = np.full((1800, 1500, 3), 120, np.uint8)
@@ -79,7 +79,8 @@ def test_corners_straighten_a_page_on_a_background():
     assert body["status"] == "complete"
     assert {"checkId": "pageBounds", "passed": True, "message": None} in body["qualityChecks"]
     assert not any("whole photo" in warning for warning in body["warnings"])
-    assert body["overlayData"]["imageWidthPx"] == 1000      # rectified to the target width
+    # Cropped to 1000 px wide; the page is slightly rotated, so deskew straightens it and enlarges the canvas a little
+    assert 1000 <= body["overlayData"]["imageWidthPx"] <= 1100
 
 
 def test_page_is_found_automatically_without_corners():

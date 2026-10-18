@@ -487,7 +487,7 @@ One card per pipeline stage: a one-sentence explanation, the formula (KaTeX), an
 
 | Card | Formula to show |
 |---|---|
-| Flattening the page | a homography: 4 corner pairs give the 8 equations for a 3×3 matrix H |
+| Cropping the page | the page is found (Otsu threshold or Canny edges, convex hull, 4 corners) and cropped without warping, so letters keep their shape |
 | Real-world scale | mm per pixel = paper width in mm ÷ page width in px |
 | Removing shadows | I = R × L, so R = I ÷ L (the lighting L is estimated by a morphological closing) |
 | Straightening | θ* = argmax over θ of Var(ink per row after rotating by θ) |

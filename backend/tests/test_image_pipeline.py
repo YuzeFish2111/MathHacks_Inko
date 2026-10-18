@@ -162,21 +162,42 @@ def test_no_page_found_when_it_fills_the_frame_or_is_missing():
     assert detect_page_corners(noise) is None
 
 
-def test_rectification_uses_corner_geometry():
-    from app.image_pipeline import rectify_page
+def test_crop_keeps_the_page_proportions():
+    from app.image_pipeline import crop_page
     photo = np.full((800, 1000, 3), 255, np.uint8)
-    page = rectify_page(photo, [[100, 100], [700, 100], [700, 500], [100, 500]])
-    assert page.shape[:2] == (667, 1000)
+    page = crop_page(photo, [[100, 100], [700, 100], [700, 500], [100, 500]])
+    assert page.shape[:2] == (667, 1000)                        # 600 x 400 crop, scaled to 1000 wide
+
+
+def test_crop_never_stretches_the_writing():
+    # A circle drawn on a page photographed with skewed corners must stay a circle (a warp would squash it)
+    from app.image_pipeline import crop_page
+    photo = np.full((900, 1200, 3), 90, np.uint8)
+    cv2.fillConvexPoly(photo, np.array([[200, 100], [1000, 160], [980, 800], [180, 760]]), (245, 245, 245))
+    cv2.circle(photo, (590, 450), 120, (0, 0, 0), 6)
+    page = crop_page(photo, [[200, 100], [1000, 160], [980, 800], [180, 760]])
+    ys, xs = np.nonzero(page[:, :, 0] < 60)
+    width, height = xs.max() - xs.min(), ys.max() - ys.min()
+    assert abs(width / height - 1) < 0.03
+
+
+def test_crop_paints_the_desk_outside_a_rotated_page_with_paper_colour():
+    from app.image_pipeline import crop_page
+    photo = np.full((900, 1200, 3), 60, np.uint8)               # dark desk
+    corners = [[260, 120], [980, 180], [940, 820], [220, 760]]
+    cv2.fillConvexPoly(photo, np.array(corners), (240, 240, 240))
+    page = crop_page(photo, corners)
+    assert page.min() >= 200                                    # no dark desk left to look like ink
 
 
 def test_invalid_corner_geometry_is_rejected():
     import pytest
-    from app.image_pipeline import rectify_page
+    from app.image_pipeline import crop_page
     photo = np.full((800, 1000, 3), 255, np.uint8)
     for corners in ([[0, 0], [float("nan"), 0], [500, 500], [0, 500]],
                     [[0, 0], [500, 500], [500, 0], [0, 500]]):
         with pytest.raises(ValueError):
-            rectify_page(photo, corners)
+            crop_page(photo, corners)
 
 
 def lit_page(lighting):

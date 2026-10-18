@@ -29,7 +29,7 @@ field-for-field. Example responses: `shared/fixtures/`.
 | `backgroundEstimate` | Estimated paper illumination/background |
 | `normalizedImage` | Shading-corrected grayscale image |
 | `inkMask` | Binary image; foreground is handwriting ink |
-| `rectifiedImage` | Cropped and perspective-corrected page |
+| `rectifiedImage` | The page cropped from the photo (no perspective warp, so letters keep their shape), lighting-corrected and straightened |
 | `cornerPointsPx` | Four page corners in originalImage pixels (top-left, top-right, bottom-right, bottom-left) |
 | `deskewAngleDeg` | Applied rotation angle in degrees |
 | `pageWidthMm`, `pageHeightMm` | User-provided physical paper dimensions |

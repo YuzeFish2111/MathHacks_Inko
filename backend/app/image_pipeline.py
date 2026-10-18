@@ -1,7 +1,7 @@
 """Image processing: from a phone photo to a clean ink mask, text lines and letter candidates.
 
 Order used by POST /api/analyze (main.py):
-  decode -> find the page (detect_page_corners) -> flatten it (rectify_page) -> grayscale
+  decode -> find the page (detect_page_corners) -> crop to it (crop_page) -> grayscale
   -> lighting correction (normalize_illumination) -> straighten (deskew) -> ink mask (threshold_ink)
   -> remove specks (remove_small_components) -> lines (find_text_lines) -> letters (find_components)
 
@@ -78,38 +78,41 @@ def decode_image(imageBytes: bytes) -> np.ndarray:
     return originalImage
 
 
-def rectify_page(originalImage: np.ndarray, cornerPointsPx: list[tuple[float, float]],
-                 targetWidthPx: int = TARGET_IMAGE_WIDTH_PX) -> np.ndarray:
-    """Perspective-correct the page so it fills a flat rectangle (rectifiedImage).
+def crop_page(originalImage: np.ndarray, cornerPointsPx: list[tuple[float, float]],
+              targetWidthPx: int = TARGET_IMAGE_WIDTH_PX) -> np.ndarray:
+    """Cut the page out of the photo (rectifiedImage) WITHOUT reshaping it.
 
     cornerPointsPx are the page corners in originalImage pixels, ordered top-left, top-right,
-    bottom-right, bottom-left. Output proportions are estimated from opposite edge lengths.
-    This is approximate for strong perspective; physical dimensions never affect geometry.
+    bottom-right, bottom-left. The photo is cropped to the rectangle around them and resized to
+    targetWidthPx wide, keeping its proportions, so letters keep their true shape (an earlier
+    perspective warp stretched them when the corners or the page proportions were off). Anything
+    outside the corners (desk showing past a slightly rotated page) is painted the paper's colour,
+    so the page edge isn't mistaken for ink; deskew later removes small rotations.
     Raises ValueError if the corners fall outside the photo or enclose no area.
     """
     imageHeightPx, imageWidthPx = originalImage.shape[:2]
-    sourceCorners = np.array(cornerPointsPx, dtype=np.float32)
-    if sourceCorners.shape != (4, 2):
+    corners = np.array(cornerPointsPx, dtype=np.float32)
+    if corners.shape != (4, 2):
         raise ValueError("cornerPointsPx must be four [x, y] points")
-    if not np.isfinite(sourceCorners).all():
+    if not np.isfinite(corners).all():
         raise ValueError("cornerPointsPx must be finite")
-    if (sourceCorners < 0).any() or (sourceCorners[:, 0] > imageWidthPx).any() \
-            or (sourceCorners[:, 1] > imageHeightPx).any():
+    if (corners < 0).any() or (corners[:, 0] > imageWidthPx).any() or (corners[:, 1] > imageHeightPx).any():
         raise ValueError("cornerPointsPx fall outside the photo")
-    if not cv2.isContourConvex(sourceCorners) or cv2.contourArea(sourceCorners) < 1:
+    if not cv2.isContourConvex(corners) or cv2.contourArea(corners) < 1:
         raise ValueError("cornerPointsPx enclose no area")
 
-    # A perspective transform (homography) is the 3x3 matrix that maps any four points onto any
-    # other four: here the photographed corners onto the corners of a flat, upright rectangle
-    topLeft, topRight, bottomRight, bottomLeft = sourceCorners
-    widthPx = (np.linalg.norm(topRight - topLeft) + np.linalg.norm(bottomRight - bottomLeft)) / 2
-    heightPx = (np.linalg.norm(bottomLeft - topLeft) + np.linalg.norm(bottomRight - topRight)) / 2
-    targetHeightPx = max(1, round(targetWidthPx * heightPx / widthPx))
-    targetCorners = np.array([[0, 0], [targetWidthPx - 1, 0],
-                              [targetWidthPx - 1, targetHeightPx - 1], [0, targetHeightPx - 1]], dtype=np.float32)
-    transform = cv2.getPerspectiveTransform(sourceCorners, targetCorners)
-    return cv2.warpPerspective(originalImage, transform, (targetWidthPx, targetHeightPx),
-                               flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REPLICATE)
+    x0, y0 = (int(np.floor(v)) for v in corners.min(axis=0))
+    x1 = min(imageWidthPx, int(np.ceil(corners[:, 0].max())))
+    y1 = min(imageHeightPx, int(np.ceil(corners[:, 1].max())))
+    pageImage = originalImage[y0:y1, x0:x1].copy()
+
+    # Paint everything outside the page outline with the paper's median colour
+    insidePage = np.zeros(pageImage.shape[:2], np.uint8)
+    cv2.fillConvexPoly(insidePage, np.round(corners - [x0, y0]).astype(np.int32), 255)
+    if (insidePage == 0).any():
+        paperColour = np.median(pageImage[insidePage > 0], axis=0)
+        pageImage[insidePage == 0] = paperColour.astype(pageImage.dtype)
+    return resize_to_width(pageImage, targetWidthPx)
 
 
 def _order_corners(points: np.ndarray) -> Optional[np.ndarray]:

@@ -67,7 +67,7 @@ backend/
 ├── requirements.txt
 ├── app/                      the API (one request flows main -> pipeline -> measurements -> scoring)
 │   ├── main.py               FastAPI app, endpoints, quality checks, overlay building
-│   ├── image_pipeline.py     page detection, flattening, lighting, deskew, ink mask, lines, letters
+│   ├── image_pipeline.py     page detection, cropping, lighting, deskew, ink mask, lines, letters
 │   ├── measurements.py       the 9 raw measurements, height groups
 │   ├── scoring.py            curves -> feature scores -> legibilityScore -> label
 │   ├── scoring_config.py     every tunable number (thresholds, curves, weights, bands)
@@ -174,7 +174,7 @@ parse_request_fields          form fields -> AnalyzeRequestFields (HTTP 422 if i
 read_and_check_upload         checks 1-4 -> originalImage (BGR array)
 prepare_page
   detect_page_corners         (only if no cornerPointsPx were sent)
-  rectify_page                perspective-correct to 1000 px wide, real proportions   [check 5]
+  crop_page                   crop to the page corners, 1000 px wide, no warping       [check 5]
     or resize_to_width        fallback: whole photo as the page, plus a warning
   scale = paper mm / page px  computed BEFORE rotation (rotation keeps mm per pixel)
   normalize_illumination      remove shadows and lighting gradients
@@ -223,7 +223,7 @@ Data classes:
 | `load_image(path)` / `decode_image(bytes)` | read a file / an upload as BGR | OpenCV; applies the photo's orientation tag |
 | `detect_page_corners(image)` | find the page's 4 corners, or None | works on a copy shrunk to 800 px; tries a brightness mask (Otsu threshold + closing) then an edge mask (Canny + dilation); convex hull; Douglas-Peucker to 4 corners; accepts if 20-97% of the photo, and at least 15 brighter than the surroundings |
 | `_order_corners` | order TL, TR, BR, BL | TL = min(x+y), BR = max(x+y), TR = min(y-x), BL = max(y-x) |
-| `rectify_page(image, corners)` | flatten the page | homography from 4 point pairs; output 1000 px wide with proportions estimated from opposite corner edge lengths; ValueError if corners are outside the photo or degenerate |
+| `crop_page(image, corners)` | cut the page out | crops to the rectangle around the 4 corners and resizes to 1000 px wide keeping proportions; no perspective warp (it distorted letters), so strong camera angles stay foreshortened; desk outside the outline is painted paper-coloured; ValueError if corners are outside the photo or enclose no area |
 | `to_grayscale`, `resize_to_width` | | `INTER_AREA` when shrinking, `INTER_LINEAR` when enlarging |
 | `estimate_background` | `backgroundEstimate`: bare-paper brightness everywhere | closing with a 31 px ellipse (removes ink), then a 5 px median blur (keeps hard shadow edges) |
 | `normalize_illumination` | `normalizedImage` | image / background x 255 (lighting model I = R x L) |
