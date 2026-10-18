@@ -8,10 +8,15 @@ let mounted = false;
 let ytBody;
 
 export function mount(el) {
-  const copy = h("button", { class: "btn btn-small", type: "button" }, icon("check"), "Copy");
+  // The checkmark only appears once the address is actually on the clipboard.
+  const copy = h("button", { class: "btn btn-small", type: "button" }, "Copy");
+  let resetCopy;
   copy.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(CONTACT.email);
+      copy.replaceChildren(icon("check"), "Copied");
+      clearTimeout(resetCopy);
+      resetCopy = setTimeout(() => copy.replaceChildren("Copy"), 2000);
       toast("Email address copied!");
     } catch (e) {
       toast(CONTACT.email);

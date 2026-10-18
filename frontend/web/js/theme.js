@@ -2,7 +2,7 @@
 const KEY = "inko-theme";
 
 export const THEMES = [
-  { id: "light", name: "White Chocolate (Light mode)", swatch: ["#f8f4e8", "#967e76"], bar: "#f8f4e8" },
+  { id: "light", name: "White Chocolate (Light mode) (recommended)", swatch: ["#f8f4e8", "#967e76"], bar: "#f8f4e8" },
   { id: "milk", name: "Milk Chocolate (in between light and dark mode)", swatch: ["#27221e", "#c9b1a6"], bar: "#27221e" },
   { id: "dark", name: "Dark Chocolate", swatch: ["#37353e", "#725a5b"], bar: "#37353e" },
 ];
