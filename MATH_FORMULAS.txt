@@ -1,0 +1,400 @@
+INKO: EVERY MATHEMATICAL FORMULA IN THE PROJECT
+================================================
+
+How to read this file
+---------------------
+* Sections follow the order a photo travels through the system: upload -> page -> lighting ->
+  ink -> lines and letters -> nine measurements -> scores -> marks and tips -> the browser.
+* Every formula names the file and function that computes it, so you can check it in the code.
+* Notation (plain text):
+    median(...)   middle value after sorting (average of the two middle values for an even count)
+    mean(...)     ordinary average
+    SD(...)       population standard deviation: sqrt( mean( (v - mean(v))^2 ) )
+    P90(...)      90th percentile (90% of values are at or below it); P10 likewise
+    |v|           absolute value
+    floor(v)      round down; ceil(v) round up
+    sum_i         add up over every item i
+    ^             power (x^2 = x squared)
+* Image coordinates: x grows to the right, y grows DOWNWARD (row 0 is the top of the image).
+  Pixel brightness runs from 0 (black) to 255 (white).
+* "px" = pixels. Most results are RATIOS (pixels divided by pixels), so they don't depend on
+  the photo's resolution. Settings come from backend/app/scoring_config.py; their values are
+  given in [square brackets].
+
+
+PART A. GETTING A CLEAN PAGE  (backend/app/image_pipeline.py, backend/app/main.py)
+==================================================================================
+
+A1. Upload checks (main.py: read_and_check_upload)
+    file size        <= 15 MB [MAX_UPLOAD_BYTES = 15 x 1024 x 1024 bytes]
+    image size       min(height, width) >= 600 px [MIN_IMAGE_SIDE_PX]
+
+A2. Colour to grayscale (to_grayscale, OpenCV COLOR_BGR2GRAY)
+    Y = 0.299 R + 0.587 G + 0.114 B
+    The weights match how sensitive the eye is to each colour (green most, blue least).
+    OpenCV stores pixels as B, G, R, which is why the flag says BGR.
+
+A3. Automatic page detection (detect_page_corners and helpers)
+    a) Shrink for speed:  s = min(1, 800 / max(H, W))  [PAGE_DETECT_MAX_SIDE_PX = 800]
+       The corners found are divided by s at the end to return to full-size coordinates.
+    b) Gaussian blur, 5 x 5 kernel: each pixel becomes a weighted average of its neighbours,
+       with weights following the bell curve  G(x, y) = exp( -(x^2 + y^2) / (2 sigma^2) ),
+       normalised to sum to 1.
+    c) Candidate mask 1, Otsu's threshold (_candidate_page_masks):
+       Try every cut-off t from 0 to 255; split the pixels into "dark" (<= t) and "bright" (> t).
+       Keep the t that maximises the between-class variance
+           sigma_B^2(t) = w0(t) * w1(t) * ( mu0(t) - mu1(t) )^2
+       where w0, w1 are the fractions of pixels in each group and mu0, mu1 their mean brightness.
+       (Equivalent to minimising the variance inside each group.) Bright = paper.
+       Then a closing with a 15 x 15 square (see A6) fills the dark writing so the page is one blob.
+    d) Candidate mask 2, Canny edges, for pages on light desks:
+       lower threshold = 0.66 x median brightness, upper = 1.33 x median brightness.
+       Canny keeps pixels where the brightness gradient (see A9) is a local maximum along the gradient
+       direction, keeps edges above the upper threshold, and keeps weaker ones (above the lower one)
+       only when connected to strong ones. The edges are then dilated with a 5 x 5 square.
+    e) Outline to four corners (_quad_from_contour):
+       - Convex hull: the smallest convex polygon containing the outline (removes dents, such as a
+         thumb over the edge).
+       - Douglas-Peucker simplification with tolerance epsilon = k x perimeter, k = 0.02, 0.03, 0.04,
+         0.05 in turn, until exactly 4 points remain. Douglas-Peucker joins the two ends of a curve
+         with a straight line, finds the point farthest from that line, and keeps it (splitting the
+         curve there) only if its distance exceeds epsilon; repeat on each piece.
+    f) Corner order (_order_corners), using that y grows downward:
+       top-left = smallest (x + y)        bottom-right = largest (x + y)
+       top-right = smallest (y - x)       bottom-left  = largest (y - x)
+       Rejected if two roles pick the same point (page turned about 45 degrees).
+    g) Is it really a page? (_looks_like_page)
+       Polygon area (shoelace formula, cv2.contourArea):
+           Area = 1/2 | sum_i ( x_i * y_(i+1) - x_(i+1) * y_i ) |   (indices wrap around)
+       area fraction = Area / (H x W) must be in [0.20, 0.97]
+           [PAGE_MIN_AREA_FRACTION, PAGE_MAX_AREA_FRACTION]; above 0.97 the "page" is just the photo's border.
+       brightness gain = median(inside) - median(outside) >= 15 [PAGE_MIN_BRIGHTNESS_GAIN]
+
+A4. Validating corners and cropping (crop_page)
+    Corners must be finite, satisfy 0 <= x <= W and 0 <= y <= H (edges allowed), form a convex
+    polygon (consecutive edge cross products all have the same sign) and enclose area >= 1 px^2.
+    Crop box:  x0 = floor(min x), y0 = floor(min y), x1 = min(W, ceil(max x)), y1 = min(H, ceil(max y))
+    Pixels inside the box but outside the polygon get the paper's colour:
+        paperColour = median of the inside pixels, per colour channel
+    No perspective warp is applied, so letters keep their true shape.
+
+A5. Resizing to a fixed width (resize_to_width)
+    factor = 1000 / W [TARGET_IMAGE_WIDTH_PX];   new height = max(1, round(H x factor))
+    Shrinking uses area averaging (INTER_AREA); enlarging uses bilinear interpolation (INTER_LINEAR).
+    Every later pixel threshold assumes this 1000 px width.
+    On-screen drawings (isDrawing) skip A3-A4 and are simply resized.
+
+A6. Lighting correction (estimate_background, normalize_illumination)
+    Model:  I(x, y) = R(x, y) x L(x, y)
+        I = observed brightness, R = true reflectance (paper ~1, ink low), L = lighting.
+    Background estimate B ~ L:
+        closing = dilation (each pixel -> max of its neighbourhood) followed by
+                  erosion  (each pixel -> min of its neighbourhood),
+        with an elliptical window of 31 px [BACKGROUND_KERNEL_PX], wider than any pen stroke, so the
+        bright paper grows over the dark ink; then a 5 x 5 median filter [BACKGROUND_SMOOTHING_PX]
+        smooths paper texture while keeping hard shadow edges sharp.
+    Normalised image:
+        N(x, y) = clip( 255 x I(x, y) / max(B(x, y), 1),  0, 255 )
+    Dividing cancels L, leaving the paper white everywhere. max(B, 1) prevents division by zero.
+
+A7. Rotation (rotate_image)
+    Rotation by angle theta about the centre (cx, cy), as OpenCV's 2 x 3 affine matrix:
+        [  cos(theta)   sin(theta)   (1 - cos theta) cx - sin(theta) cy ]
+        [ -sin(theta)   cos(theta)   sin(theta) cx + (1 - cos theta) cy ]
+    Canvas enlarged so nothing is cut off:
+        W' = ceil( H |sin theta| + W |cos theta| - 0.000001 )
+        H' = ceil( H |cos theta| + W |sin theta| - 0.000001 )
+    (the tiny 0.000001 stops floating-point noise, e.g. cos 90 deg = 6e-17, adding an extra pixel),
+    and the translation is shifted by (W'/2 - cx, H'/2 - cy) so the image stays centred.
+
+A8. Deskew: straightening the writing (estimate_deskew_angle_deg, deskew)
+    Projection profile for angle theta:  P_theta(row) = number of ink pixels in that row after rotating.
+    Score(theta) = variance of P_theta = mean( (P - mean(P))^2 )
+    Candidates: theta = 0.5 x k degrees for k = -30 ... 30, i.e. -15 to +15 deg in 0.5 deg steps
+        [DESKEW_MAX_ANGLE_DEG = 15, DESKEW_STEP_DEG = 0.5], tried smallest |theta| first.
+    deskewAngle = argmax Score(theta); a tie keeps the smaller angle (so a blank page stays at 0).
+    Why it works: level text puts all its ink in a few rows (tall peaks, empty gaps) = high variance;
+    tilted text smears ink over many rows = flat profile = low variance.
+
+A9. Ink mask: adaptive threshold (threshold_ink)
+    First a 3 x 3 Gaussian blur [BLUR_KERNEL_PX]. Then for each pixel:
+        T(x, y) = Gaussian-weighted mean of the 31 x 31 neighbourhood [THRESHOLD_BLOCK_SIZE_PX] - 10 [C]
+        ink if  I(x, y) <= T(x, y)      (inverted binary: ink = 255, paper = 0)
+    A pixel is ink when it is at least about 10 levels darker than its surroundings, so leftover
+    brightness differences across the page don't matter.
+
+A10. Noise removal (remove_small_components)
+    Connected components with 8-connectivity: two ink pixels belong to the same blob if they touch
+    sideways, vertically or diagonally. Blobs with area < 10 px are removed [MIN_COMPONENT_AREA_PX].
+
+A11. Photo quality numbers (main.py: segment_writing; image_pipeline.py)
+    Ink fraction    = ink pixels / all pixels                       must be >= 0.0005 [MIN_INK_FRACTION]
+    Ink contrast    = median(paper) - median(ink)                   must be >= 30 [MIN_INK_CONTRAST]
+                      paper = pixels with no ink within 2 px (mask dilated by 5 x 5 is 0), so stroke
+                      edges don't count as paper
+    Edge sharpness  = P90( |grad I| on the ink edges ) / ink contrast   must be >= 0.2 [MIN_EDGE_SHARPNESS]
+        Sobel gradient: gx = (I convolved with [-1 0 1; -2 0 2; -1 0 1]) / 8, gy likewise vertically,
+        |grad I| = sqrt(gx^2 + gy^2). Dividing by 8 turns Sobel's output into brightness change per pixel.
+        Ink edges = morphological gradient (dilation minus erosion, 3 x 3) of the ink mask.
+        Theory: a perfectly sharp step edge of height C gives a central difference of C/2, so the
+        ratio is about 0.5; blur spreads the step over more pixels and lowers it.
+        Dividing by contrast means faint-but-sharp writing is not mistaken for blur.
+    Letters         = number of "letter" components (see B2)    must be >= 10 [MIN_LETTERS_FOR_ANALYSIS]
+        When it fails, joined letters are estimated (main.py: segmentation_message):
+            letters in a cluster ~ max(2, round( cluster width / median letter width ))
+            if letters + letters-in-clusters >= 10 -> "letters are joined"; otherwise "write more".
+
+
+PART B. LINES AND LETTERS  (backend/app/image_pipeline.py)
+==========================================================
+
+B1. Text lines (find_text_lines)
+    rowInk(r) = ink pixels in row r.
+    A row is text if rowInk(r) >= max(1, 0.05 x max_r rowInk(r)) [LINE_MIN_INK_FRACTION].
+    Text rows less than or equal to 6 px apart are merged into one band [LINE_MERGE_GAP_PX]
+    (this joins i-dots to their line); bands shorter than 8 px are dropped [LINE_MIN_HEIGHT_PX].
+
+B2. Components (find_components)
+    Each connected ink blob has a bounding box (x, y, width, height) and an area.
+    Vertical overlap with a line:  overlap = min(blob bottom, line bottom) - max(blob top, line top) + 1
+    The blob joins the line with the largest overlap. A blob touching no line joins the nearest one
+    only if its gap is <= 0.5 x that line's height [NEAR_LINE_MAX_GAP_RATIO]; otherwise it is ignored.
+    Classification, with m = median component height in the line:
+        mark     if height < 0.4 x m        [MARK_MAX_HEIGHT_RATIO]  (dots, commas)
+        cluster  if width  > 2.0 x m        [CLUSTER_MIN_WIDTH_RATIO] (joined letters)
+        letter   otherwise
+    Only "letter" components are used for size and shape measurements.
+
+
+PART C. THE NINE MEASUREMENTS  (backend/app/measurements.py)
+============================================================
+A measurement is null (None) when there isn't enough data, never 0.
+Minimum counts: 5 letters for statistics [MIN_COMPONENTS_FOR_STATS], 4 letter gaps
+[MIN_GAPS_FOR_STATS], 3 letters per line for a baseline [MIN_LETTERS_FOR_BASELINE].
+
+C0. Shared tools
+    Coefficient of variation:  CV = SD(v) / mean(v)     (unitless; 0 = all equal; 0.38 = typical
+                                                         difference of 38% from the average)
+    Robust spread (MAD scaled):  sigma_robust = 1.4826 x median( |v - median(v)| )
+        For normally distributed data this equals the standard deviation, because
+        1.4826 = 1 / 0.6745 and 0.6745 is the 75th percentile of the standard normal distribution
+        (so half of all values lie within 0.6745 SD of the centre). Unlike the SD, a few extreme
+        values barely move it.
+    Ratio helper: a / b, or null if either is missing or b <= 0.
+
+C1. x-height (measure_x_height_px), the height of small letters, used to scale distances
+    For each line: rows with rowInk >= 0.5 x (the line's busiest row) [X_HEIGHT_ROW_FRACTION] form the
+    x-height band; its height = the number of such rows. Ascenders and descenders are thin strokes,
+    so their rows never reach that level.
+    xHeightPx = median over lines.
+
+C2. Baseline: Theil-Sen regression (fit_baseline, using SciPy stats.theilslopes)
+    Points: one per letter, (x = horizontal centre, y = bottom edge).
+        slope m     = median over all pairs i < j with x_i != x_j of  (y_j - y_i) / (x_j - x_i)
+        intercept c = median(y) - m x median(x)
+        baseline:  y = m x + c
+    n letters give n(n-1)/2 slopes. Breakdown point about 29% (1 - 1/sqrt 2): up to ~29% of points
+    can be arbitrarily wrong without dragging the line away. Least squares has a breakdown point of 0.
+
+C3. Height groups (small_letter_cluster, classify_height_groups)
+    Natural break in each line's letter heights h (sorted ascending, h_1 <= ... <= h_n):
+        minLower = max(2, ceil(0.2 n))                                      [HEIGHT_GROUP_MIN_SHARE]
+        jump_k   = h_k / h_(k-1)   for k = minLower+1 ... n
+        k*       = the k with the largest jump
+        if jump_k* >= 1.15 [HEIGHT_GROUP_BREAK_RATIO]:
+            body = median(h_1 ... h_(k*-1))    smallMax = h_(k*-1)
+        else:
+            body = median(all h)               smallMax = none
+    For each letter, with baselineY = m x centre + c:
+        aboveRatio = (baselineY - top) / body          how high it rises above the line
+        belowRatio = (bottom - baselineY) / body       how far it hangs below the line
+        ascender   if aboveRatio >= 1.20                             [ASCENDER_MIN_RATIO]
+        descender  if belowRatio > 0.25 and aboveRatio >= 0.75       [DESCENDER_MIN_RATIO, DESCENDER_TOP_MIN_RATIO]
+        small      if height <= smallMax  (no break: aboveRatio <= 1.12 [X_HEIGHT_GROUP_MAX_RATIO])
+    Group = "ascenderDescender" if both; else "descender"; else "xHeight" if small; else "ascender"
+    if ascender; else "intermediate" (never compared).
+
+C4. The nine measurements
+    1  textHeightCanvasRatio  = median(letter heights) / page height in px (before deskew)
+                                null when page edges are unknown or the image is a drawing.
+    2  xHeightAscenderRatio   = median(xHeight-group heights) / median(ascender-group heights)
+                                (each group needs >= 3 letters [MIN_HEIGHT_GROUP_SIZE])
+    3  baselineVariationRatio = sigma_robust(residuals) / xHeightPx
+                                residual = bottom - (m x centre + c), for every letter except
+                                descenders and ascenderDescenders, pooled over all lines
+    4  slantStdDeg            = SD of letter slants (degrees)
+                                slant = atan( mu11 / mu02 ) converted to degrees, from central moments
+                                of the letter's outline (treated as a filled shape):
+                                    mu_pq = integral over the shape of (x - xbar)^p (y - ybar)^q
+                                mu11/mu02 is the slope of x against y (sideways shift per unit of height),
+                                i.e. a regression of x on y.
+    5  letterHeightCv         = SD of the pooled values  h / median(h of its group),
+                                for the xHeight and ascender groups (each needs >= 3 letters).
+                                The group median scales each to 1, so this SD is a CV.
+    6  strokeContrastRatio    = P90(w) / P10(w)      (1.0 = perfectly even strokes)
+    7  strokeWidthRatio       = median(w) / xHeightPx
+       where w = stroke widths: D = Euclidean distance from each ink pixel to the nearest paper pixel
+       (OpenCV DIST_L2 with a 5 x 5 mask); ridge pixels (stroke centres) satisfy D > 0 and
+       D >= max of D in the 3 x 3 neighbourhood;  w = 2D - 1 at each ridge pixel
+       (a centre pixel D px from paper on both sides spans D + D - 1 px, counting itself once).
+    8  relativeLetterSpacing  = median(letter gaps) / xHeightPx
+    9  letterSpacingCv        = CV(letter gaps) = SD / mean
+       Gaps (find_gaps), between neighbouring non-mark components in a line:
+           gap = max(0, x_right - (x_left + width_left))          (overlap counts as 0)
+           word gap if  median(line's gaps) > 0  and  gap > 2.5 x median(line's gaps)  [WORD_GAP_MIN_RATIO]
+           every other gap is a letter gap.
+
+
+PART D. FROM MEASUREMENTS TO A SCORE  (backend/app/scoring.py, backend/app/scoring_config.py)
+=============================================================================================
+
+D1. Sweet-spot (trapezoid) curve, for "too small and too big are both bad" (sweet_spot_score)
+        score(v) = 0                    if v <= a or v >= d
+                 = (v - a) / (b - a)    if a < v < b       (rising edge)
+                 = 1                    if b <= v <= c     (ideal range)
+                 = (d - v) / (d - c)    if c < v < d       (falling edge)
+    Parameters (a, b, c, d):
+        textHeightCanvasRatio  (0.005, 0.010, 0.025, 0.050)
+        xHeightAscenderRatio   (0.30,  0.45,  0.75,  0.95)
+        strokeWidthRatio       (0.02,  0.06,  0.18,  0.35)
+        relativeLetterSpacing  (0.0,   0.15,  0.6,   1.2)
+
+D2. Decreasing curve, for variation where less is better (decreasing_score)
+        score(v) = 1                        if v <= v0
+                 = (v1 - v) / (v1 - v0)     if v0 < v < v1
+                 = 0                        if v >= v1
+    Parameters (v0, v1):
+        baselineVariationRatio (0.10, 0.80)     slantStdDeg     (2.0, 20.0)
+        strokeContrastRatio    (1.2,  4.0)      letterSpacingCv (0.15, 1.0)
+        letterHeightCv         (0.05, 0.35)
+    A missing value (null, NaN, infinity) scores null on either curve.
+
+D3. Feature scores (compute_feature_scores)
+    feature score = mean of its available source scores.
+    Seven features have one source; shapeConsistency = mean( score(slantStdDeg), score(letterHeightCv) ).
+    Feature -> source:
+        textSize <- textHeightCanvasRatio        xHeight <- xHeightAscenderRatio
+        baselineConsistency <- baselineVariationRatio
+        shapeConsistency <- slantStdDeg, letterHeightCv
+        strokeContrast <- strokeContrastRatio    strokeWeight <- strokeWidthRatio
+        letterSpacing <- relativeLetterSpacing   spacingConsistency <- letterSpacingCv
+
+D4. Final score (compute_legibility_score)
+    Weights: w_i = 1/8 for every feature (placeholders until fitted to human ratings).
+    Using only the set A of available (non-null) features:
+        w'_i  = w_i / sum_(j in A) w_j                  (rescaled to sum to 1)
+        exact = 100 x sum_(i in A) w'_i x s_i
+        legibilityScore = floor(exact + 0.5)            (round half up: 84.5 -> 85)
+    A missing feature counts as neither 0 nor perfect: it is left out. Example: with textSize
+    missing (drawings), each of the other 7 features weighs 1/7.
+    (Python's own round() would round 84.5 to 84, "banker's rounding", hence floor(x + 0.5).)
+
+D5. Label (score_label): the first band whose minimum the score reaches:
+        >= 85 "Very legible"    >= 70 "Readable"    >= 50 "Some difficulty"    otherwise "Hard to read"
+
+
+PART E. MARKS ON THE PHOTO AND TIPS  (backend/app/issues.py, backend/app/advice.py, backend/app/main.py)
+========================================================================================================
+
+E1. Overlay lines (main.py: build_overlay_data)
+    Baseline drawn from x1 = leftmost component to x2 = rightmost:  y = m x + c
+    x-height line: the same line moved up by xHeightPx:  y = m x + c - xHeightPx
+
+E2. Problem marks (find_component_issues, find_gap_issues), all distances in x-heights
+    Whole-page features (textSize, xHeight, strokeContrast, strokeWeight): if the feature's score
+        <= 0.9 [ISSUE_MAX_FEATURE_SCORE], every letter is marked with it.
+    Cluster (joined letters): marked letterSpacing.
+    Baseline, per letter (heightAbove = baselineY - top; typicalTop = median heightAbove in the line):
+        bottomOffset = (bottom - baselineY) / xHeightPx
+        topOffset    = (typicalTop - heightAbove) / xHeightPx          (+ means lower than usual)
+        floating if bottomOffset < -0.25;  sunk if bottomOffset > 0.25 and topOffset > 0.25
+        [ISSUE_BASELINE_OFFSET_RATIO]. A descender drops only its tail (its top stays level), so it isn't marked.
+    Slant: marked if |slant - median slant| > 25 degrees [ISSUE_SLANT_DEVIATION_DEG].
+    Letter gaps:
+        letterSpacing      if gap / xHeightPx is outside the ideal range [0.15, 0.6] (b and c of D1)
+        spacingConsistency if |gap - median gap| / xHeightPx > 0.25 [ISSUE_GAP_DEVIATION_RATIO]
+        Word gaps are never marked.
+
+E3. Tips (generate_advice, build_advice_item)
+    Weak features: score <= 0.9 [ADVICE_MAX_FEATURE_SCORE], sorted by score, lowest first (ties keep the
+    feature order), at most 3 [MAX_ADVICE_ITEMS].
+    For shapeConsistency the tip describes its weakest source: argmin over sources of the source score.
+    Direction: "low" if v < b on a sweet-spot curve, otherwise "high".
+    Displayed numbers: value x multiplier, rounded (e.g. letterSpacingCv 0.38 x 100 -> "38%").
+
+E4. Approximate physical size warning (main.py: append_text_size_warning; never affects the score)
+    letter height in mm = textHeightCanvasRatio x pageHeightMm
+    (or, with only the width given: pageHeightMm = pageWidthMm x page height px / page width px)
+    warning if below 2 mm or above 10 mm [MIN_TEXT_HEIGHT_MM, MAX_TEXT_HEIGHT_MM].
+
+
+PART F. TEXT RECOGNITION (DISPLAY ONLY)  (backend/app/accuracy_evaluation.py)
+=============================================================================
+    EasyOCR returns detections (box, text, confidence c_i in [0, 1]).
+    n_i = number of non-space characters in detection i; empty detections are skipped.
+        mean confidence = sum_i c_i n_i / sum_i n_i       (character-weighted mean)
+        confidence %    = 100 x mean confidence
+    Null when no text is found. Never part of the legibility score.
+
+
+PART G. THE INKO WEB APP  (frontend/server, frontend/web/js)
+============================================================
+
+G1. Photo preparation (server/imaging.py)
+    Photos are scaled by  min(1, 2000 / longest side)  [MAX_MODEL_SIDE] before going to the backend;
+    history thumbnails fit inside 360 x 360 px [THUMB_SIDE], keeping the aspect ratio.
+
+G2. Tilted-photo check (server/photo_checks.py: detect_tilt)
+    Same steps as A3 (shrink to 800 px, Gaussian blur, Otsu, 15 x 15 closing, convex hull,
+    Douglas-Peucker with 2%, 3%, 4.5% of the perimeter). The page must cover 12%-96% of the photo,
+    with no corner within 1.2% of the photo's longest side from its edge.
+    Side ratio  = min( min(top, bottom) / max(top, bottom),  min(left, right) / max(left, right) )
+                  (side lengths are Euclidean distances: sqrt(dx^2 + dy^2))
+    Corner angle at B between neighbours A and C:
+        theta = arccos( (BA . BC) / (|BA| |BC|) )       (dot product formula)
+    tilted if  side ratio < 0.86  or  max |theta - 90 deg| > 15 deg
+    A photo of a flat page taken at an angle turns the rectangle into a trapezoid; turning the page
+    on the table keeps it a rectangle, so that isn't flagged.
+
+G3. Summary scores for Progress and Practice (server/main.py: summary_scores)
+    score out of 100 = round(100 x feature score). Note: this uses Python's round(), which rounds
+    exact halves to the even neighbour, unlike the half-up rounding of the overall score (D4).
+    This only matters for a feature score of exactly x.xx5.
+
+G4. The maths panel (web/js/maths.js, web/js/components/mathpanel.js)
+    Score breakdown and the "What if?" simulator use exact copies of D1-D5, with the curves and
+    weights read from the backend (GET /api/scoring-model), so the browser always matches the backend.
+        What-if slider ranges: decreasing curve  [0, 1.25 x v1];
+                               sweet spot        [max(0, a - (b - a)),  d + (d - c)];
+                               always widened to include the person's own value (and 1.1 x it).
+        Weights shown as fractions: "1/n" when |1/n - w| < 0.000001 with n = round(1 / w).
+    Robust-statistics demo, comparing two lines through the same letter bottoms:
+        Theil-Sen        as C2 (pairs with equal x skipped)
+        Least squares    slope = sum (x - xbar)(y - ybar) / sum (x - xbar)^2,
+                         intercept = ybar - slope x xbar
+                         (minimises the sum of squared vertical distances, so one far point pulls hard)
+        Tilt shown       = atan(slope) x 180 / pi   degrees
+        Spreads shown    = sigma_robust (C0) and the plain SD of the residuals from the Theil-Sen line
+        Plot mapping (data -> screen, linear):
+            screenX = PAD + (x - minX) / max(1, maxX - minX) x (W - 2 PAD)
+            screenY = PAD + (y - yTop) / span x (H - 2 PAD)
+        with span = max(2 x median letter height, (max y - min y) + 20) and yTop centred on the points.
+
+G5. Progress page (web/js/pages/progress.js)
+    Change = newest score - oldest score (shown as "+n", "-n" or "No change"); best = maximum score.
+
+
+PART H. WORKED EXAMPLE: ONE LINE THROUGH THE WHOLE CHAIN
+========================================================
+Letter bottoms at x = 10, 30, 50, 70, 90 with y = 100, 100, 100, 100, 120 (the last is a descender).
+  Theil-Sen: 6 pair slopes are 0; the 4 involving the descender are 0.25, 0.33, 0.5, 1.
+             Sorted: 0,0,0,0,0,0,0.25,0.33,0.5,1. Median = average of 5th and 6th = 0.
+             Intercept = median(y) - 0 x median(x) = 100. Baseline: y = 100.
+  Least squares: slope 0.2, intercept 94 (tilted), so four perfectly placed letters would show
+             residuals of +4, 0, -4, -8 px.
+  Baseline variation: the descender is excluded (C3); residuals of the four letters are 0, 0, 0, 0,
+             so sigma_robust = 0 and baselineVariationRatio = 0 -> score 1 on (0.10, 0.80).
+  Example scoring: slant SD 8 deg -> (20 - 8) / 18 = 0.667; height CV 0.08 -> (0.35 - 0.08) / 0.30 = 0.9;
+             shapeConsistency = (0.667 + 0.9) / 2 = 0.783.
+  If the eight feature scores were 1, 1, 1, 0.783, 0.786, 1, 0.667, 0.706:
+             exact = 100 x (sum / 8) = 100 x 6.942 / 8 = 86.8 -> legibilityScore 87 -> "Very legible".
