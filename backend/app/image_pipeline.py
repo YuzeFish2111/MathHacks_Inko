@@ -27,6 +27,7 @@ from .scoring_config import (TARGET_IMAGE_WIDTH_PX, BACKGROUND_KERNEL_PX, BACKGR
 
 
 @dataclass
+#defines how a letter component is stored in the code
 class LetterComponent:
     """One connected ink blob in rectifiedImage pixels. A candidate only; not guaranteed to be a letter."""
     componentId: str
@@ -41,6 +42,7 @@ class LetterComponent:
 
 
 @dataclass
+#defines how a text line is stored in the code
 class TextLine:
     """One detected writing line; textLines are ordered top-to-bottom."""
     lineId: str
@@ -48,6 +50,7 @@ class TextLine:
     bottomPx: int
     components: list[LetterComponent] = field(default_factory=list)    # sorted left to right
 
+#allows for heic type images (iphone default) to be decoded 
 def decode_heic(imageBytes: bytes) -> np.ndarray:
     from io import BytesIO
     from PIL import Image, ImageOps
@@ -55,6 +58,8 @@ def decode_heic(imageBytes: bytes) -> np.ndarray:
 
     register_heif_opener()
 
+    #rotates it according to the orientation tag
+    #convert to rgb
     with Image.open(BytesIO(imageBytes)) as image:
         rgb = ImageOps.exif_transpose(image).convert("RGB")
         return cv2.cvtColor(np.array(rgb), cv2.COLOR_RGB2BGR)
