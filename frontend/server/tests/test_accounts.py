@@ -81,9 +81,9 @@ def test_signed_in_results_are_saved_and_listed():
     sign_up(client)
     first = analyze(client).json()
     assert first["saved"] is True
-    analyze(client)
+    second = analyze(client).json()
     items = client.get("/api/history").json()["items"]
-    assert len(items) == 2 and items[0]["id"] == first["result_id"]
+    assert [i["id"] for i in items] == [first["result_id"], second["result_id"]]   # oldest first
     full = client.get(f"/api/history/{first['result_id']}").json()
     assert full["overall_score"] == first["overall_score"]
     assert client.get(full["analysis"]["rectifiedImage"]).headers["content-type"] == "image/jpeg"
@@ -120,6 +120,8 @@ def test_history_is_private():
     assert bob.get(f"/api/history/{rid}").status_code == 404
     assert bob.get(f"/api/history/{rid}/image.jpg").status_code == 404
     assert bob.get("/api/history").json()["items"] == []
+    assert bob.delete("/api/history").json()["deleted"] == 0            # bob's "delete all" can't reach alice's
+    assert [i["id"] for i in alice.get("/api/history").json()["items"]] == [rid]
 
 
 def test_avatar_upload_accepts_heic():

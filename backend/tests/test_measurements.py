@@ -3,7 +3,7 @@ import numpy as np
 
 from app.image_pipeline import find_text_lines, find_components
 from app.measurements import (compute_feature_measurements, measure_stroke_widths_px, measure_slant_std_deg,
-                              measure_x_height_px, classify_height_groups)
+                              measure_x_height_px, classify_height_groups, measure_baseline_variation_px)
 
 def draw_letter_line(baselineOffsetsPx=(0,) * 8, strokePx=5):
     """One line of 8 identical hollow 'letters' (20 x 40 px), 10 px apart, then a word gap of 50 px
@@ -97,14 +97,15 @@ def test_empty_page_gives_all_null():
 
 # ---------- height groups: letters are only compared with letters of the same height ----------
 
-def draw_mixed_height_line(xHeightPx=30, ascenderPx=50, descenderTailPx=15, sunkenPx=0, xHeightJitterPx=()):
+def draw_mixed_height_line(xHeightPx=30, ascenderPx=50, descenderTailPx=15, sunkenPx=0, xHeightJitterPx=(),
+                           pattern="xxaxdxax" * 2, bottomJitterPx=()):
     """A line mixing x-height letters, ascenders and descenders, like real lowercase writing.
 
-    Pattern (repeated): x, x, ascender, x, descender, x, ascender, x. Baseline at y = 140.
+    Default pattern (repeated): x, x, ascender, x, descender, x, ascender, x. Baseline at y = 140.
     sunkenPx moves the 2nd letter (an x-height letter) down as a whole, off the line.
     xHeightJitterPx: per-x-height-letter height changes, to make same-height letters uneven.
+    bottomJitterPx: per-letter up/down shifts (whole letter), to make the baseline a little uneven.
     """
-    pattern = "xxaxdxax" * 2
     inkMask = np.zeros((240, 900), np.uint8)
     baselinePx, xPx, xIndex = 140, 30, 0
     for letterIndex, kind in enumerate(pattern):
@@ -113,6 +114,8 @@ def draw_mixed_height_line(xHeightPx=30, ascenderPx=50, descenderTailPx=15, sunk
             heightPx += xHeightJitterPx[xIndex % len(xHeightJitterPx)]
             xIndex += 1
         shiftPx = sunkenPx if letterIndex == 1 else 0
+        if bottomJitterPx:
+            shiftPx += bottomJitterPx[letterIndex % len(bottomJitterPx)]
         topPx, bottomPx = baselinePx - heightPx + shiftPx, baselinePx + shiftPx
         inkMask[topPx:bottomPx, xPx:xPx + 20] = 255
         inkMask[topPx + 4:bottomPx - 4, xPx + 4:xPx + 16] = 0
@@ -141,8 +144,10 @@ def test_sunken_letter_is_not_mistaken_for_a_descender():
 def test_mixed_heights_are_not_counted_as_inconsistency():
     m = measure(draw_mixed_height_line())
     assert m["letterHeightCv"] == 0                         # every group is perfectly even
-    heights = [30, 30, 50, 30, 45, 30, 50, 30] * 2          # yet the raw heights vary a lot
-    assert np.std(heights) / np.mean(heights) > 0.2
+    inkMask = draw_mixed_height_line()
+    heights = [c.heightPx for line in find_components(inkMask, find_text_lines(inkMask))
+               for c in line.components if c.kind == "letter"]
+    assert np.std(heights) / np.mean(heights) > 0.2         # yet the drawn letters' raw heights vary a lot
 
 
 def test_uneven_letters_within_a_group_are_detected():
@@ -156,7 +161,15 @@ def test_x_height_is_compared_with_ascenders():
 
 
 def test_descenders_dont_count_as_baseline_variation():
-    assert measure(draw_mixed_height_line(descenderTailPx=20))["baselineVariationRatio"] == 0
+    # Many descenders on a slightly uneven line: counted, their tails would inflate the spread.
+    # (With only a few descenders the robust spread ignores them anyway, so that can't test this.)
+    inkMask = draw_mixed_height_line(descenderTailPx=20, pattern="xdxdxdxa" * 2, bottomJitterPx=(0, 2, -2, 3, -3))
+    textLines = find_components(inkMask, find_text_lines(inkMask))
+    withDescendersPx = measure_baseline_variation_px(textLines)
+    withoutDescendersPx = measure_baseline_variation_px(textLines, classify_height_groups(textLines))
+    assert withoutDescendersPx < withDescendersPx / 2
+    xHeightPx = measure_x_height_px(inkMask, textLines)
+    assert abs(measure(inkMask)["baselineVariationRatio"] * xHeightPx - withoutDescendersPx) < 1e-6
 
 
 def test_sunken_letters_still_count_as_baseline_variation():

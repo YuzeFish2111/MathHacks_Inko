@@ -53,5 +53,10 @@ def test_model_that_fails_to_load_is_reported_once_and_returns_none(monkeypatch)
 
 def test_disabled_ocr_never_loads_the_model(monkeypatch):
     monkeypatch.setattr(ocr, "OCR_ENABLED", False)
-    monkeypatch.setattr(ocr, "load_reader", lambda: (_ for _ in ()).throw(AssertionError("should not load")))
+    monkeypatch.setattr(ocr, "_reader", None)
+    monkeypatch.setattr(ocr, "_readerLoadFailed", False)    # so only OCR_ENABLED can stop the load
+    loadAttempts = []
+    # Recorded, not raised: get_reader catches every load error, so raising here would go unnoticed
+    monkeypatch.setattr(ocr, "load_reader", lambda: loadAttempts.append(1) or FakeReader([]))
     assert ocr.get_reader() is None
+    assert loadAttempts == []

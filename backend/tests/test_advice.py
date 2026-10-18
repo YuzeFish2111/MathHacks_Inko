@@ -78,4 +78,5 @@ def test_every_template_produces_a_valid_advice_item():
         featureId = next(f for f, sources in FEATURE_SOURCES.items() if name in sources)
         tip = build_advice_item(featureId, dict(PERFECT_MEASUREMENTS, **{name: worst[direction]}))
         AdviceItem.model_validate(tip)
+        assert tip["title"] == ADVICE_TEMPLATES[(name, direction)]["title"], (name, direction)   # this case's own tip
         assert not re.search(r"[{}]", tip["message"]), name    # every placeholder was filled

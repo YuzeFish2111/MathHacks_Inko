@@ -40,10 +40,7 @@ def error_code(response):
 
 
 def test_health():
-        assert client.get("/api/health").json() == {
-        "status": "ok",
-        "schemaVersion": "2.1",
-    }
+    assert client.get("/api/health").json() == {"status": "ok", "schemaVersion": "2.1"}
 
 
 def test_complete_result_without_corners():
@@ -138,6 +135,15 @@ def test_too_few_letters_is_segmentation_uncertain():
     page = np.full((1414, 1000, 3), 255, np.uint8)
     cv2.putText(page, "abc", (300, 600), cv2.FONT_HERSHEY_SIMPLEX, 5, (0, 0, 0), 12)   # plenty of ink, 3 letters
     assert error_code(post(png_bytes(page))) == "SEGMENTATION_UNCERTAIN"
+
+
+def test_corners_on_the_exact_photo_border_are_accepted():
+    # What Inko sends for drawings (whole_page): the photo's own corners, on its very edge
+    corners = json.dumps([[0, 0], [1000, 0], [1000, 1414], [0, 1414]])
+    body = post(png_bytes(make_page_photo()), cornerPointsPx=corners).json()
+    assert body["status"] == "complete"
+    assert {"checkId": "pageBounds", "passed": True, "message": None} in body["qualityChecks"]
+    assert body["featureMeasurements"]["textHeightCanvasRatio"] is not None
 
 
 def test_corners_outside_the_photo():

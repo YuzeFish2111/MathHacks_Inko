@@ -101,7 +101,7 @@ def test_sharpness_is_about_half_for_a_sharp_edge_and_drops_with_blur():
                                         cv2.GaussianBlur(make_text_page(), (0, 0), sigma))[1]
                  for sigma in (0, 1, 2, 4)]
     assert 0.45 <= sharpness[0] <= 0.55
-    assert sharpness == sorted(sharpness, reverse=True)          # more blur, less sharp
+    assert all(a > b for a, b in zip(sharpness, sharpness[1:]))  # more blur, strictly less sharp
 
 
 def test_faint_but_sharp_writing_is_not_called_blurry():
