@@ -35,8 +35,7 @@ MathHacks_Project/
 |   |   |-- [x] scoring.py               curves, featureScores, legibilityScore, featureWeights,
 |   |   |                                missingFeatureIds, scoreLabel
 |   |   |-- [x] issues.py                issueFeatureIds: marks problem letters and gaps on the overlays
-|   |   |-- [x] advice.py                weakest-first rule-based tips (templates per measurement + direction)
-|   |   `-- [ ] fit_weights.py           regression of weights against human ratings
+|   |   `-- [x] advice.py                weakest-first rule-based tips (templates per measurement + direction)
 |   |-- scripts/
 |   |   `-- [x] preview_ink_mask.py      debug tool: prints and plots the ink mask (needs matplotlib)
 |   `-- tests/
@@ -92,8 +91,8 @@ Plan step                                   Status
 4. Measurements                             [x] all ten, unit-tested
 5. Scoring and advice                       [x] feature scores, renormalized weights, bands, tips
 6. API, overlays, validation                [~] /api/analyze complete; overlays mark problem letters and
-                                                gaps (issueFeatureIds); fit_weights.py and validation
-                                                analysis not started
+                                                gaps (issueFeatureIds); weight fitting and validation
+                                                analysis not started (method: validation/WEIGHT_FITTING_GUIDE.md)
 Extra: OCR (contract 1.4)                   [x] display-only: recognizedText ("what a computer read");
                                                 never part of the score. Real model not yet run here
                                                 (Mac certificates)
@@ -118,7 +117,7 @@ Remaining backend work
   [x] Automatic page detection when no cornerPointsPx are sent
   [ ] Endpoint that returns detected corners for the preview/crop screen (contract addition)
   [x] issueFeatureIds on overlay components and gaps
-  [ ] fit_weights.py once validation ratings exist
+  [ ] Fit the weights once validation ratings exist (validation/WEIGHT_FITTING_GUIDE.md)
   [x] OCR made display-only (recognizedText); removed from scoring in contract 1.4
   [ ] Fix Mac certificates (Install Certificates.command) and run the real OCR model on test photos
   [ ] Optional: letter-level work (x-height consistency, comparison to an ideal example)
@@ -176,7 +175,6 @@ backend/app/  (the API; every request goes main.py -> image_pipeline -> measurem
   accuracy_evaluation.py What EasyOCR reads on the straightened page, returned as recognizedText for
                          display only (never scored). Loads the model once and shares it; if it can't
                          load, recognizedText is null instead of the API failing.
-  fit_weights.py         Placeholder for fitting the feature weights to human ratings.
   __init__.py            Marks app/ as a Python package (empty on purpose).
 
 backend/scripts/  (developer tools, run by hand)

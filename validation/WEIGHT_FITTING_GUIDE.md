@@ -120,7 +120,7 @@ sheet can't be trusted, whatever weight it gets.
 
 ## Step 5: Shared helper code
 
-Put these functions in `backend/app/fit_weights.py` (currently a placeholder). They were tested
+Put these functions in your analysis notebook (`validation/analysis.ipynb`) or a script. They were tested
 on simulated data: a very large penalty returns exactly equal weights, and every coefficient stays
 at 0 or above.
 

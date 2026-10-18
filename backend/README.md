@@ -75,7 +75,6 @@ backend/
 │   ├── issues.py             issueFeatureIds: which overlay boxes show a problem
 │   ├── schemas.py            Pydantic models = the response contract
 │   ├── accuracy_evaluation.py  EasyOCR text recognition (display only)
-│   ├── fit_weights.py        placeholder for fitting weights to human ratings
 │   └── __init__.py           marks app/ as a package (empty on purpose)
 ├── scripts/
 │   └── preview_ink_mask.py   shows a photo next to its ink mask (needs matplotlib)
@@ -443,7 +442,7 @@ asked, so tests draw pixel-exact shapes with NumPy slicing instead.
 The weights and curve values are placeholders until compared with blind human ratings. The full method
 (consent, rating protocol, rater agreement with ICC, non-negative ridge regression toward equal weights
 with leave-one-out selection, bootstrap intervals, Spearman correlation on a held-out test set) is in
-`validation/WEIGHT_FITTING_GUIDE.md`. `fit_weights.py` is where that code will go.
+`validation/WEIGHT_FITTING_GUIDE.md`, which includes the fitting code.
 
 ---
 

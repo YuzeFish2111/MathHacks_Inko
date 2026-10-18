@@ -14,7 +14,7 @@ How a raw measurement becomes a 0-1 feature score:
       score 1 at or below v0, falling in a straight line to 0 at v1 and above.
 
 All curve values and weights are first guesses (placeholders). The plan is to check them against
-blind human ratings (backend/app/fit_weights.py) before claiming the score is calibrated.
+blind human ratings (validation/WEIGHT_FITTING_GUIDE.md) before claiming the score is calibrated.
 """
 
 FEATURE_IDS = ("textSize", "xHeight", "baselineConsistency", "shapeConsistency",
