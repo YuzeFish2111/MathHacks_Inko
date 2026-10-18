@@ -220,7 +220,7 @@ def resize_to_width(image: np.ndarray, targetWidthPx: int = TARGET_IMAGE_WIDTH_P
     interpolation = cv2.INTER_AREA if resizeFactor < 1 else cv2.INTER_LINEAR
     return cv2.resize(image, (targetWidthPx, targetHeightPx), interpolation=interpolation)
 
-
+#blur the result
 def estimate_background(grayscaleImage: np.ndarray) -> np.ndarray:
     """backgroundEstimate: how bright the bare paper is at every pixel.
 
@@ -233,7 +233,7 @@ def estimate_background(grayscaleImage: np.ndarray) -> np.ndarray:
     paperOnly = cv2.morphologyEx(grayscaleImage, cv2.MORPH_CLOSE, window)
     return cv2.medianBlur(paperOnly, BACKGROUND_SMOOTHING_PX)
 
-
+#use the background estimate to normalize the image so that the paper is white and the ink is dark
 def normalize_illumination(grayscaleImage: np.ndarray) -> np.ndarray:
     """normalizedImage: divide by backgroundEstimate so paper becomes white everywhere.
 
@@ -262,6 +262,7 @@ def threshold_ink(grayscaleImage: np.ndarray) -> np.ndarray:
         THRESHOLD_BLOCK_SIZE_PX,
         THRESHOLD_OFFSET_C,
     )
+#removes small blobs of ink that are likely noise
 
 
 def remove_small_components(inkMask: np.ndarray, minAreaPx: int = MIN_COMPONENT_AREA_PX) -> np.ndarray:
