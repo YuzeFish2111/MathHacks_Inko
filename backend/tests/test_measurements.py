@@ -172,3 +172,32 @@ def test_sunken_letters_still_count_as_baseline_variation():
         inkMask[:, xPx:xPx + 20] = np.roll(inkMask[:, xPx:xPx + 20].copy(), shiftPx, axis=0)
     assert groups_in_order(inkMask).count("descender") == 2           # only the two real descenders
     assert measure(inkMask)["baselineVariationRatio"] > 0
+
+
+def draw_pattern_line(pattern, smallPx=30, tallPx=50, tallerSmall=()):
+    """Boxes along one baseline: "a" = tall letter (capital, b, d, h, l), "x" = small letter.
+    tallerSmall: indexes of small letters written 20% too tall."""
+    inkMask = np.zeros((240, 60 + 32 * len(pattern)), np.uint8)
+    for i, kind in enumerate(pattern):
+        heightPx = tallPx if kind == "a" else round(smallPx * (1.2 if i in tallerSmall else 1))
+        xPx, topPx = 30 + 32 * i, 140 - heightPx
+        inkMask[topPx:140, xPx:xPx + 20] = 255
+        inkMask[topPx + 4:136, xPx + 4:xPx + 16] = 0
+    return inkMask
+
+
+def test_lines_with_mostly_tall_letters_are_grouped_correctly():
+    # Like "Blah blah blah": 9 tall letters, 3 small. The line's median letter is tall, which used to
+    # turn every tall letter into a "small" one (small/tall ratio 1.0, score 0).
+    pattern = "aaxa" * 3
+    groups = groups_in_order(draw_pattern_line(pattern))
+    assert groups == ["ascender" if kind == "a" else "xHeight" for kind in pattern]
+    assert abs(measure(draw_pattern_line(pattern))["xHeightAscenderRatio"] - 30 / 50) < 1e-9
+
+
+def test_small_letter_written_too_tall_still_counts_as_uneven():
+    even = measure(draw_mixed_height_line())["letterHeightCv"]
+    pattern = "xxaxxaxxax"
+    uneven = measure(draw_pattern_line(pattern, tallerSmall=(0, 4)))
+    assert groups_in_order(draw_pattern_line(pattern, tallerSmall=(0, 4)))[0] == "xHeight"
+    assert uneven["letterHeightCv"] > even + 0.05

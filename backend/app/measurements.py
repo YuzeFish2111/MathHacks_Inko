@@ -18,7 +18,7 @@ from .image_pipeline import LetterComponent, TextLine
 from .scoring_config import (MIN_COMPONENTS_FOR_STATS, MIN_GAPS_FOR_STATS, MIN_LETTERS_FOR_BASELINE,
                              X_HEIGHT_ROW_FRACTION, WORD_GAP_MIN_RATIO, X_HEIGHT_GROUP_MAX_RATIO,
                              ASCENDER_MIN_RATIO, DESCENDER_MIN_RATIO, DESCENDER_TOP_MIN_RATIO,
-                             MIN_HEIGHT_GROUP_SIZE)
+                             MIN_HEIGHT_GROUP_SIZE, HEIGHT_GROUP_BREAK_RATIO, HEIGHT_GROUP_MIN_SHARE)
 
 # Median absolute deviation (MAD) x 1.4826 equals the standard deviation for normally distributed data,
 # but a few extreme values (descenders, stray marks) barely move it. 1.4826 = 1 / 0.6745, where 0.6745
@@ -102,14 +102,49 @@ def fit_baseline(line: TextLine) -> Optional[tuple[float, float]]:
     return float(slope), float(intercept)
 
 
+def small_letter_cluster(letterHeightsPx: list[float]) -> tuple[float, Optional[float]]:
+    """A line's small letters, found from the letters' own heights (top to bottom).
+
+    Sort the heights and find the natural break between small letters and tall ones (capitals,
+    b, d, h, k, l, and g, p, y with their tails): the biggest proportional jump between neighbours.
+    It counts if it is at least HEIGHT_GROUP_BREAK_RATIO and the cluster below it holds at least
+    HEIGHT_GROUP_MIN_SHARE of the letters (and 2). Own heights, not heights above the baseline, so a
+    letter that has sunk or floated off the line still counts as small.
+
+    Returns (bodyPx, smallMaxPx): the small letters' median height (the x-height reference) and the
+    tallest small letter, or (median of all, None) when there is no clear break. Works however many
+    tall letters a sentence has ("Blah blah blah" is mostly tall letters, which broke the old rule of
+    taking the line's median letter as the small-letter height).
+    """
+    heights = sorted(h for h in letterHeightsPx if h > 0)
+    if not heights:
+        return 0.0, None
+    minLower = max(2, int(np.ceil(HEIGHT_GROUP_MIN_SHARE * len(heights))))
+    bestJump, bestSplit = 1.0, None
+    for split in range(minLower, len(heights)):          # heights[:split] is the lower cluster
+        jump = heights[split] / heights[split - 1]
+        if jump > bestJump:
+            bestJump, bestSplit = jump, split
+    if bestSplit is not None and bestJump >= HEIGHT_GROUP_BREAK_RATIO:
+        return float(np.median(heights[:bestSplit])), float(heights[bestSplit - 1])
+    return float(np.median(heights)), None
+
+
 def classify_height_groups(textLines: list[TextLine]) -> dict[str, str]:
     """componentId -> height group, for letters on lines with a fitted baseline.
 
     Groups: "xHeight" (a, e, o ...), "ascender" (b, d, h, k, l, capitals), "descender" (g, j, p, q, y),
-    "ascenderDescender" (both, e.g. a looped f), or "intermediate" (between groups; never compared).
-    Heights are multiples of the line's typical body height: the median height above the baseline, which
-    tracks the x-height because most letters are x-height letters. A descender must keep its top level;
-    a letter whose top AND bottom are low has sunk below the line, so it stays in its group.
+    "ascenderDescender" (both, e.g. a looped f), or "intermediate" (unclear; never compared).
+
+    Per line, small_letter_cluster splits the letters at the natural break in their own heights:
+    - at or below the break, and not a descender -> "xHeight" (even if written a bit too tall, so
+      that unevenness is still measured);
+    - above the break -> "ascender" if its top rises at least ASCENDER_MIN_RATIO x the small-letter
+      height above the baseline, otherwise "intermediate";
+    - a tail more than DESCENDER_MIN_RATIO below the baseline with the top still level -> "descender"
+      (a letter whose top AND bottom are low has sunk below the line, so it stays in its group).
+    With no clear break (all letters about one height) the old rule applies: top at most
+    X_HEIGHT_GROUP_MAX_RATIO x the median height -> "xHeight".
     """
     groups = {}
     for line in textLines:
@@ -118,24 +153,24 @@ def classify_height_groups(textLines: list[TextLine]) -> dict[str, str]:
             continue
         slope, intercept = baseline
         letters = [component for component in line.components if component.kind == "letter"]
-        baselinesYPx = [slope * (letter.xPx + letter.widthPx / 2) + intercept for letter in letters]
-        heightsAbovePx = [baselineYPx - letter.yPx for letter, baselineYPx in zip(letters, baselinesYPx)]
-        typicalBodyPx = float(np.median(heightsAbovePx))
-        if typicalBodyPx <= 0:
+        bodyPx, smallMaxPx = small_letter_cluster([letter.heightPx for letter in letters])
+        if bodyPx <= 0:
             continue
-        for letter, baselineYPx, heightAbovePx in zip(letters, baselinesYPx, heightsAbovePx):
-            aboveRatio = heightAbovePx / typicalBodyPx
-            belowRatio = (letter.yPx + letter.heightPx - baselineYPx) / typicalBodyPx
+        for letter in letters:
+            baselineYPx = slope * (letter.xPx + letter.widthPx / 2) + intercept
+            aboveRatio = (baselineYPx - letter.yPx) / bodyPx
+            belowRatio = (letter.yPx + letter.heightPx - baselineYPx) / bodyPx
             isAscender = aboveRatio >= ASCENDER_MIN_RATIO
             isDescender = belowRatio > DESCENDER_MIN_RATIO and aboveRatio >= DESCENDER_TOP_MIN_RATIO
+            isSmall = letter.heightPx <= smallMaxPx if smallMaxPx is not None else aboveRatio <= X_HEIGHT_GROUP_MAX_RATIO
             if isAscender and isDescender:
                 groups[letter.componentId] = "ascenderDescender"
-            elif isAscender:
-                groups[letter.componentId] = "ascender"
             elif isDescender:
                 groups[letter.componentId] = "descender"
-            elif aboveRatio <= X_HEIGHT_GROUP_MAX_RATIO:
+            elif isSmall:
                 groups[letter.componentId] = "xHeight"
+            elif isAscender:
+                groups[letter.componentId] = "ascender"
             else:
                 groups[letter.componentId] = "intermediate"
     return groups

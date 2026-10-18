@@ -132,9 +132,10 @@ Full examples (illustrative values only, not calibrated):
 
 ## Height groups (2.1)
 
-Letters are only compared with letters of the same height. Each letter is assigned a group from its
-height above the line's fitted baseline, in multiples of the line's typical body height (the median,
-which tracks the x-height): x-height letters (top <= 1.12), ascenders (top >= 1.20), descenders (tail
+Letters are only compared with letters of the same height. Each line's letters are split at the natural
+break in their own heights (the biggest jump of at least 15%), so this works however many capitals or tall
+letters a sentence has: x-height letters are below the break, and their median height is the reference
+for the rest. Ascenders are above it with a top >= 1.20 x that reference above the baseline; descenders (tail
 > 0.25 below the baseline with the top still >= 0.75, so a sunken letter isn't excused as a descender),
 and in-between letters, which are never compared. `xHeightAscenderRatio` compares the two
 main groups; `letterHeightCv` measures evenness within each group; `baselineVariationRatio` ignores

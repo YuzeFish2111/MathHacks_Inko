@@ -255,10 +255,13 @@ Only `kind == "letter"` components are used for size and shape.
 | `letterSpacingCv` | ratio | coefficient of variation (std / mean) of letter gaps |
 
 **Height groups (`classify_height_groups`).** Letters are only compared with letters of the same height.
-Per line, each letter's height above the fitted baseline is divided by the line's typical body height
-(the median, which tracks the x-height): at most 1.12 is an x-height letter, at least 1.20 an ascender,
-in between is excluded; a tail more than 0.25 below the baseline with the top still at least 0.75 high
-is a descender (a letter whose top AND bottom are low has sunk, so it isn't excused as a descender).
+Per line, the letters' own heights are sorted and split at the natural break (the biggest jump, at
+least 15%, with at least 20% of the letters below it): letters below the break are x-height letters,
+and their median height is the line's small-letter reference. Above the break, a letter whose top
+rises at least 1.20 x that reference above the baseline is an ascender (otherwise excluded). A tail
+more than 0.25 below the baseline with the top still at least 0.75 high is a descender (a letter whose
+top AND bottom are low has sunk, so it isn't excused as a descender). This works however many tall
+letters a sentence has; with no clear break, letters with tops up to 1.12 x the median are x-height letters.
 `xHeightAscenderRatio`, `letterHeightCv` and `baselineVariationRatio` use these groups.
 
 `find_gaps()` lists every gap between neighbouring non-mark components and labels it `"word"` if wider

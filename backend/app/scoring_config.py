@@ -115,14 +115,19 @@ MIN_GAPS_FOR_STATS = 4          # fewer within-word letter gaps than this -> spa
 MIN_LETTERS_FOR_BASELINE = 3    # a line needs this many letters to fit its baseline
 X_HEIGHT_ROW_FRACTION = 0.5     # rows with >= this fraction of a line's peak ink form the x-height band
 WORD_GAP_MIN_RATIO = 2.5        # gap wider than this x the line's median gap -> word gap, not letter gap
-# Height groups: letters are only compared with letters of the same height group. Ratios are multiples of
-# the line's typical body height (median height above the baseline; most letters are x-height letters)
-X_HEIGHT_GROUP_MAX_RATIO = 1.12 # top at most this high -> x-height letter (a, e, o, n ...; print ~0.96-1.00)
-ASCENDER_MIN_RATIO = 1.20       # top at least this high -> ascender (b, d, h, k, l, capitals; print ~1.3,
-                                # handwriting ~1.5-2.0); between the two -> excluded, never compared
+# Height groups: letters are only compared with letters of the same height group. Each line's letters are
+# split at the natural break in their heights (HEIGHT_GROUP_BREAK_RATIO below); ratios are multiples of the
+# small letters' median height
+X_HEIGHT_GROUP_MAX_RATIO = 1.12 # only when a line has NO clear break: top at most this high -> x-height letter
+ASCENDER_MIN_RATIO = 1.20       # above the break, top at least this high -> ascender (b, d, h, k, l, capitals;
+                                # print ~1.3, handwriting ~1.5-2.0); otherwise excluded, never compared
 DESCENDER_MIN_RATIO = 0.25      # tail more than this below the baseline ...
 DESCENDER_TOP_MIN_RATIO = 0.75  # ... with the top still at least this high -> descender (g, p, y); else a sunken letter
 MIN_HEIGHT_GROUP_SIZE = 3       # a group needs this many letters to be compared
+HEIGHT_GROUP_BREAK_RATIO = 1.15 # the small-letter reference is the cluster below the biggest jump in a line's sorted
+                                # letter heights, if that jump is at least 15% (small letters vary less than that)
+HEIGHT_GROUP_MIN_SHARE = 0.2    # ... and that cluster holds at least 20% of the line's letters (and 2 letters), so one
+                                # sunken letter can't pose as the small-letter group. No clear break -> the line's median
 # Broad warning defaults for ordinary handwriting; never used in scoring.
 MIN_TEXT_HEIGHT_MM = 2.0
 MAX_TEXT_HEIGHT_MM = 10.0
