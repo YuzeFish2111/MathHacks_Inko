@@ -27,6 +27,7 @@ from .scoring_config import (TARGET_IMAGE_WIDTH_PX, BACKGROUND_KERNEL_PX, BACKGR
 
 
 @dataclass
+#defines how a letter component is stored in the code
 class LetterComponent:
     """One connected ink blob in rectifiedImage pixels. A candidate only; not guaranteed to be a letter."""
     componentId: str
@@ -41,6 +42,7 @@ class LetterComponent:
 
 
 @dataclass
+#defines how a text line is stored in the code
 class TextLine:
     """One detected writing line; textLines are ordered top-to-bottom."""
     lineId: str
@@ -48,6 +50,7 @@ class TextLine:
     bottomPx: int
     components: list[LetterComponent] = field(default_factory=list)    # sorted left to right
 
+#allows for heic type images (iphone default) to be decoded 
 def decode_heic(imageBytes: bytes) -> np.ndarray:
     from io import BytesIO
     from PIL import Image, ImageOps
@@ -55,6 +58,8 @@ def decode_heic(imageBytes: bytes) -> np.ndarray:
 
     register_heif_opener()
 
+    #rotates it according to the orientation tag
+    #convert to rgb
     with Image.open(BytesIO(imageBytes)) as image:
         rgb = ImageOps.exif_transpose(image).convert("RGB")
         return cv2.cvtColor(np.array(rgb), cv2.COLOR_RGB2BGR)
@@ -68,6 +73,7 @@ def load_image(path: str) -> np.ndarray:
 def decode_image(imageBytes: bytes) -> np.ndarray:
     buffer = np.frombuffer(imageBytes, dtype=np.uint8)
     originalImage = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+    # If OpenCV can't decode it (e.g. HEIC), try Pillow with the HEIF plugin
 
     if originalImage is None:
         try:
@@ -77,7 +83,7 @@ def decode_image(imageBytes: bytes) -> np.ndarray:
 
     return originalImage
 
-
+#crops away everything outside the page (the desk around it), without stretching the page
 def crop_page(originalImage: np.ndarray, cornerPointsPx: list[tuple[float, float]],
               targetWidthPx: int = TARGET_IMAGE_WIDTH_PX) -> np.ndarray:
     """Cut the page out of the photo (rectifiedImage) WITHOUT reshaping it.
@@ -164,7 +170,7 @@ def _candidate_page_masks(grayscaleImage: np.ndarray):
     edges = cv2.Canny(blurredImage, 0.66 * medianLevel, 1.33 * medianLevel)
     yield cv2.dilate(edges, np.ones((5, 5), np.uint8))
 
-
+#checks if a region of the image looks like paper
 def _looks_like_page(corners: np.ndarray, grayscaleImage: np.ndarray) -> bool:
     """Size, shape and brightness checks that reject desks, books and blocks of text."""
     imageAreaPx = grayscaleImage.shape[0] * grayscaleImage.shape[1]
@@ -189,6 +195,8 @@ def detect_page_corners(originalImage: np.ndarray) -> Optional[list[tuple[float,
     smallImage = cv2.resize(originalImage, None, fx=shrinkFactor, fy=shrinkFactor, interpolation=cv2.INTER_AREA)
     smallGrayscale = to_grayscale(smallImage)
 
+    #tries each candidate mask (bright areas, then edges) and returns the first outline with four
+    #corners that passes the page checks; corners are scaled back up to the original photo's size
     for pageMask in _candidate_page_masks(smallGrayscale):
         contours, _ = cv2.findContours(pageMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:5]:    # biggest outlines first
@@ -213,7 +221,7 @@ def resize_to_width(image: np.ndarray, targetWidthPx: int = TARGET_IMAGE_WIDTH_P
     interpolation = cv2.INTER_AREA if resizeFactor < 1 else cv2.INTER_LINEAR
     return cv2.resize(image, (targetWidthPx, targetHeightPx), interpolation=interpolation)
 
-
+#estimates how bright the bare paper is at each point: erases the ink, then smooths what's left
 def estimate_background(grayscaleImage: np.ndarray) -> np.ndarray:
     """backgroundEstimate: how bright the bare paper is at every pixel.
 
@@ -226,7 +234,7 @@ def estimate_background(grayscaleImage: np.ndarray) -> np.ndarray:
     paperOnly = cv2.morphologyEx(grayscaleImage, cv2.MORPH_CLOSE, window)
     return cv2.medianBlur(paperOnly, BACKGROUND_SMOOTHING_PX)
 
-
+#use the background estimate to normalize the image so that the paper is white and the ink is dark
 def normalize_illumination(grayscaleImage: np.ndarray) -> np.ndarray:
     """normalizedImage: divide by backgroundEstimate so paper becomes white everywhere.
 
@@ -257,13 +265,16 @@ def threshold_ink(grayscaleImage: np.ndarray) -> np.ndarray:
     )
 
 
+#removes small blobs of ink that are likely noise
 def remove_small_components(inkMask: np.ndarray, minAreaPx: int = MIN_COMPONENT_AREA_PX) -> np.ndarray:
     """Drop connected ink components smaller than minAreaPx (isolated noise)."""
     # Connected components: every separate blob of touching ink pixels (diagonals count, so
     # connectivity=8) gets its own number in `labels`; componentStats holds each blob's box and area
+    # separate groups of touching ink pixels
     _, labels, componentStats, _ = cv2.connectedComponentsWithStats(inkMask, connectivity=8)
     keep = componentStats[:, cv2.CC_STAT_AREA] >= minAreaPx    # one True/False per blob number
     keep[0] = False    # label 0 is the paper background
+    #keeps only blobs with at least the minimum ink area
     # keep[labels] looks up every pixel's blob number in `keep`: a True/False image in one step, no loop
     return np.where(keep[labels], 255, 0).astype(np.uint8)
 
@@ -289,8 +300,10 @@ def measure_edge_sharpness(grayscaleImage: np.ndarray, inkMask: np.ndarray,
     divided by inkContrast. Blur spreads each edge over more pixels, lowering the ratio; dividing
     by contrast means faint-but-sharp writing is not mistaken for blur.
     """
+    # no ink contrast: sharpness can't be measured, so return None (unknown), not an error
     if not inkContrast or inkContrast <= 0:
         return None
+    #calculates brightness changes
     imageFloat = grayscaleImage.astype(np.float32)
     # Sobel / 8 = brightness change per pixel (central difference, smoothed across 3 rows)
     gradientX = cv2.Sobel(imageFloat, cv2.CV_32F, 1, 0, ksize=3) / 8
