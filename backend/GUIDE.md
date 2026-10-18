@@ -7,7 +7,7 @@ to three practice tips. Built with FastAPI, OpenCV, NumPy and SciPy.
 The score isn't validated against human ratings yet (see [Validation](#10-validation-not-yet-run)), so
 present it as an estimate.
 
-Contract version: **2.1**. Tests: **105**, all passing (on synthetic images).
+Contract version: **2.1**. Tests: **112**, all passing (on synthetic images).
 
 **Contents**
 1. [Quick start](#1-quick-start)
@@ -482,7 +482,7 @@ images from a Python shell (`cv2.imwrite`) after each `image_pipeline` function.
 | `recognizedText` always null; warning "Text recognition isn't available" | EasyOCR missing, or its model download failed (on Macs, usually `CERTIFICATE_VERIFY_FAILED`) | run Applications > Python 3.x > *Install Certificates.command*, then restart the server (a failed load is remembered until restart). Scores are unaffected |
 | `import cv2` errors after installing | `easyocr` installed `opencv-python` next to `opencv-python-headless` | `pip uninstall opencv-python` |
 | `Could not open requirements file` | wrong folder | run `pip install -r requirements.txt` from `backend/`, or use `backend/requirements.txt` from the root |
-| Browser blocked by CORS | frontend not on `localhost:5173` | use the Vite proxy described in `frontend/README.md`, or add the origin in `main.py` |
+| Browser blocked by CORS | frontend not on `localhost:5173` | use the Vite proxy described in `frontend/GUIDE.md`, or add the origin in `main.py` |
 | Letters measured far too big (e.g. 30 mm) | page edges not visible, so the whole photo was used as the page | photograph the whole page on a darker surface, or send `cornerPointsPx` |
 | Sideways photo gives nonsense | deskew only handles +/- 15 degrees | rotate in the browser (rotate button) before uploading |
 | Every photo `SEGMENTATION_UNCERTAIN` | joined (cursive) writing, so few separate letters | write in print; or review `CLUSTER_MIN_WIDTH_RATIO` |

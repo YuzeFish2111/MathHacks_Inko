@@ -110,7 +110,7 @@ and 50 Theil-Sen fits (identical scores, labels and fits); keep the two in step 
 
 ## Rules carried over from the frontend guide
 
-These come from `IMPORTANT_READS.md` and the contract, and the code follows them:
+These come from the team's frontend notes and the contract, and the code follows them:
 
 - **Never rename a contract field.** Inko reads `analysis.*` with the contract's names. Labels,
   units and the feature-to-worksheet mapping live in `web/js/features.js`.
