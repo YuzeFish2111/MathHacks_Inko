@@ -12,7 +12,7 @@ import * as about from "./pages/about.js";
 import * as contact from "./pages/contact.js";
 
 const PAGES = { home, decoder, practice, progress, about, contact };
-const TITLES = { home: "Inko", decoder: "Decoder", practice: "Practice", progress: "Progress", about: "About Us", contact: "Contact" };
+const TITLES = { home: "Inko", decoder: "Decoder", practice: "Practice", progress: "Progress", about: "About Us", contact: "Contact Us" };
 const mounted = new Set();
 let currentPage = null;
 
@@ -66,7 +66,7 @@ function openMore() {
   };
   const sheet = openDialog({
     title: "More",
-    body: h("div", { class: "sheet-links" }, link("#/about", "person", "About Us"), link("#/contact", "mail", "Contact")),
+    body: h("div", { class: "sheet-links" }, link("#/about", "person", "About Us"), link("#/contact", "mail", "Contact Us")),
   });
 }
 

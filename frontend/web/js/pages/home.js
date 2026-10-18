@@ -53,7 +53,7 @@ export function mount(el) {
   );
 
   el.append(hero, steps, factors, tips,
-    h("footer", { class: "site-footer" }, "Inko 2026", h("a", { href: "#/about" }, "About Us"), h("a", { href: "#/contact" }, "Contact")));
+    h("footer", { class: "site-footer" }, "Inko 2026", h("a", { href: "#/about" }, "About Us"), h("a", { href: "#/contact" }, "Contact Us")));
 }
 
 function step(ic, title, text) {
