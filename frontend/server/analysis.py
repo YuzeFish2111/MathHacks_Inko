@@ -5,6 +5,7 @@ the answer against the backend's own Pydantic contract (backend/app/schemas.py),
 that drifts fails here with a clear log line instead of breaking the page.
 """
 import importlib.util
+import json
 import logging
 from types import ModuleType
 
@@ -45,11 +46,23 @@ def validate(body: dict) -> dict:
         raise InkoError("analysis_failed") from exc
 
 
-async def analyze(jpeg: bytes) -> dict:
-    """POST the photo to the backend. Returns a contract-valid AnalysisResponse (either status)."""
+def whole_image_corners(widthPx: int, heightPx: int) -> str:
+    """cornerPointsPx (JSON) saying "the whole image is the page": top-left, top-right, bottom-right,
+    bottom-left. Used for on-screen drawings and the bundled example, where there are no page edges
+    to find; without it the backend can't tell "page fills the photo" from "no page found" and
+    leaves textHeightCanvasRatio out."""
+    return json.dumps([[0, 0], [widthPx, 0], [widthPx, heightPx], [0, heightPx]])
+
+
+async def analyze(jpeg: bytes, wholePageSizePx: tuple[int, int] | None = None) -> dict:
+    """POST the photo to the backend. Returns a contract-valid AnalysisResponse (either status).
+
+    wholePageSizePx: (width, height) of the JPEG when the whole image is known to be the page.
+    """
+    form = {"cornerPointsPx": whole_image_corners(*wholePageSizePx)} if wholePageSizePx else None
     try:
         async with httpx.AsyncClient(timeout=config.ANALYSIS_TIMEOUT_S) as client:
-            res = await client.post(f"{config.ANALYSIS_API_URL}/api/analyze",
+            res = await client.post(f"{config.ANALYSIS_API_URL}/api/analyze", data=form,
                                     files={"imageFile": ("photo.jpg", jpeg, "image/jpeg")})
     except httpx.TimeoutException as exc:
         log.error("The analysis backend took longer than %ss", config.ANALYSIS_TIMEOUT_S)

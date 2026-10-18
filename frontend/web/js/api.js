@@ -36,9 +36,11 @@ async function request(path, { method = "GET", body, json, timeout = 90000 } = {
 }
 
 export const api = {
-  analyze(blob, filename = "photo.jpg") {
+  /** wholePage: the whole image is the page (on-screen drawing, bundled example), not a photo of one. */
+  analyze(blob, filename = "photo.jpg", { wholePage = false } = {}) {
     const form = new FormData();
     form.append("file", blob, filename);
+    if (wholePage) form.append("whole_page", "true");
     return request("/analyze", { method: "POST", body: form, timeout: 120000 });
   },
   health: () => request("/api/health", { timeout: 5000 }),

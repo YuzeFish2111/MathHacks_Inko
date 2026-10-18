@@ -70,7 +70,9 @@ browser (web/)  ──POST /analyze──▶  Inko server (server/)  ──POST 
 
 1. The browser checks the file type and size, shrinks big photos, and posts to Inko's `POST /analyze`.
 2. The Inko server identifies the file from its bytes, converts HEIC to JPEG, applies EXIF rotation
-   (OpenCV in the backend ignores both), resizes to at most 2000 px, and checks for a tilted page.
+   (so the backend always gets an upright JPEG), resizes to at most 2000 px, and checks for a tilted page.
+   Drawings and the "Try an example" photo are sent with `whole_page`, which Inko passes on as
+   full-image `cornerPointsPx`, so the backend can judge letter size without page edges.
 3. It forwards the JPEG to the backend's `POST /api/analyze` and validates the answer against the
    backend's own Pydantic contract (`backend/app/schemas.py`), so a drifted field fails loudly.
 4. The answer is passed to the browser unchanged as `analysis`, wrapped with Inko's own fields:

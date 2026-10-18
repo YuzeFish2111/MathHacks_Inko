@@ -6,7 +6,7 @@ httpx==0.28.1                    # forwards photos to the analysis backend (back
 
 # Image handling before the photo goes to the analysis backend (HEIC, EXIF, tilt check).
 # Headless OpenCV, the same flavour as backend/, so the two never clash in one environment.
-numpy==2.2.6
+numpy>=2.2.6,<3                  # a range: 2.2.x has no Python 3.14 build, newer 2.x needs 3.11+
 opencv-python-headless==4.14.0.94
 pillow==12.3.0
 pillow-heif==1.8.1

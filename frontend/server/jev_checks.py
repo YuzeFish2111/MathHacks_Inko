@@ -69,8 +69,8 @@ async def photo_check(image: PreparedImage) -> dict | None:
     """Probabilities for tilted / has_handwriting / shadows, or None if skipped."""
     if not enabled():
         return None
-    from typesafe_sdk import Image, Noul
     try:
+        from typesafe_sdk import Image, Noul   # inside the try: a missing SDK is skipped, not a crash
         result = await _ask(
             ["A student took this photo of their handwriting on paper so an app can score how legible it is:",
              Image(_photo_for_jev(image))],

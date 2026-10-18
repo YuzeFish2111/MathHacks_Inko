@@ -25,7 +25,7 @@ export function mount(el) {
   el.append(h("div", { class: "card decoder" }, uploadPanel, miggle.panel));
   const fromPhoto = (file) => { mode = "photo"; handleFile(file); };
   pickers = createPickers(fromPhoto);
-  drawPad = createDrawPad({ onSubmit: handleFile });
+  drawPad = createDrawPad({ onSubmit: (file) => handleFile(file, { wholePage: true }) });
   setupDragAndDrop(uploadPanel, fromPhoto);
   document.addEventListener("keydown", (e) => {
     if (visible && mode === "draw" && drawPad.el.isConnected && (e.metaKey || e.ctrlKey) && e.key === "z") {
@@ -80,7 +80,7 @@ async function runExample() {
   if (busy) return;
   try {
     mode = "photo";
-    handleFile(await exampleFile());
+    handleFile(await exampleFile(), { wholePage: true });
   } catch (e) {
     showError(e);
   }
@@ -125,7 +125,8 @@ async function openSaved(id) {
   }
 }
 
-async function handleFile(file) {
+/** wholePage: the image IS the page (drawing, example), so its size can be judged without page edges. */
+async function handleFile(file, { wholePage = false } = {}) {
   if (busy || !file) return;
   busy = true;
   let prepared;
@@ -140,7 +141,7 @@ async function handleFile(file) {
   const dots = miggle.typing();
   const started = Date.now();
   try {
-    const result = await api.analyze(prepared.blob, prepared.name);
+    const result = await api.analyze(prepared.blob, prepared.name, { wholePage });
     await sleep(Math.max(0, MIN_LOADING_MS - (Date.now() - started)));
     dots.remove();
     await renderResult(result);

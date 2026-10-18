@@ -56,12 +56,20 @@ def fixture(name: str) -> dict:
     return body
 
 
-def fake_backend(monkeypatch, response: dict | None = None, error: Exception | None = None) -> list[bytes]:
-    """Replace the HTTP call to the analysis backend. Returns the list of JPEGs it was sent."""
-    sent: list[bytes] = []
+class SentPhotos(list):
+    """The JPEGs sent to the fake backend, plus the wholePageSizePx each was sent with."""
+    def __init__(self):
+        super().__init__()
+        self.wholePageSizes: list = []
 
-    async def analyze(jpeg: bytes) -> dict:
+
+def fake_backend(monkeypatch, response: dict | None = None, error: Exception | None = None) -> SentPhotos:
+    """Replace the HTTP call to the analysis backend. Returns the list of JPEGs it was sent."""
+    sent = SentPhotos()
+
+    async def analyze(jpeg: bytes, wholePageSizePx=None) -> dict:
         sent.append(jpeg)
+        sent.wholePageSizes.append(wholePageSizePx)
         if error:
             raise error
         return analysis.validate(copy.deepcopy(response or fixture("complete-response")))

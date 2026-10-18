@@ -9,7 +9,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, File, Request, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -74,7 +74,9 @@ def summary_scores(result: dict) -> dict:
 
 
 @app.post("/analyze")
-async def analyze(request: Request, file: UploadFile = File(...)):
+async def analyze(request: Request, file: UploadFile = File(...), whole_page: bool = Form(False)):
+    """whole_page: the whole image is the page (on-screen drawing, bundled example), so the backend
+    is told its exact bounds instead of looking for page edges that aren't there."""
     data = await file.read()
     image = await run_in_threadpool(imaging.prepare, data)
     tilt = await run_in_threadpool(photo_checks.detect_tilt, image.gray)
@@ -82,7 +84,7 @@ async def analyze(request: Request, file: UploadFile = File(...)):
     # Jev looks at the photo while the backend scores it (skipped when there is no key).
     jev_task = asyncio.create_task(jev_checks.photo_check(image)) if jev_checks.enabled() else None
     try:
-        result = await analysis.analyze(image.jpeg)
+        result = await analysis.analyze(image.jpeg, (image.width, image.height) if whole_page else None)
         jev = await jev_task if jev_task else None
     finally:
         if jev_task and not jev_task.done():

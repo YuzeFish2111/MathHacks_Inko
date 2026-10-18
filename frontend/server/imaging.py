@@ -1,8 +1,8 @@
 """Turn any upload (PNG, JPEG, HEIC, WebP) into an upright JPEG the analysis backend can use.
 
-Phones send HEIC and rotate photos with an EXIF flag instead of rotating the pixels.
-cv2.imdecode ignores that flag, so we decode with Pillow, apply the rotation, and only
-then send a plain JPEG on to the analysis backend.
+Phones send HEIC and rotate photos with an EXIF flag instead of rotating the pixels. We decode
+with Pillow, apply the rotation, and send a plain upright JPEG, so the analysis backend never has
+to rely on its own HEIC or orientation handling.
 """
 import base64
 import io
@@ -120,8 +120,8 @@ class PreparedImage:
 
 
 def prepare(data: bytes) -> PreparedImage:
-    """HEIC to JPEG, EXIF rotation applied, at most MAX_MODEL_SIDE px. The analysis backend
-    decodes with OpenCV, which ignores EXIF and can't open HEIC, so this must happen first."""
+    """HEIC to JPEG, EXIF rotation applied, at most MAX_MODEL_SIDE px, before the photo goes to
+    the analysis backend (which then always receives an upright JPEG)."""
     img = fit(open_upload(data), config.MAX_MODEL_SIDE)
     gray = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2GRAY)
     return PreparedImage(pil=img, gray=gray, jpeg=jpeg_bytes(img, 92))
