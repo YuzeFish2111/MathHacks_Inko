@@ -8,6 +8,7 @@ import json
 import sys
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from server import analysis, config
@@ -39,7 +40,12 @@ def test_whole_image_corners_are_in_contract_order():
 
 
 def test_real_backend_scores_letter_size_only_with_the_flag(monkeypatch):
-    """End to end with the real analysis backend (backend/app, run in-process, OCR off)."""
+    """End to end with the real analysis backend (backend/app, run in-process, OCR off).
+
+    Needs the backend's own packages (SciPy etc.), which Inko's .venv doesn't install, so it is
+    skipped there and runs where the backend's requirements are installed.
+    """
+    pytest.importorskip("scipy", reason="needs the analysis backend's packages (pip install -r backend/requirements.txt)")
     sys.path.insert(0, str(config.PROJECT_ROOT / "backend"))
     import app.main as backend_main
     monkeypatch.setattr(backend_main, "read_handwriting", lambda grayscaleImage: None)

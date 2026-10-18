@@ -4,7 +4,6 @@ POST /analyze prepares the photo (HEIC, EXIF rotation, resize) and forwards it t
 analysis backend's POST /api/analyze (backend/, see shared/analysis-contract.md). The backend's
 answer is passed through unchanged as `analysis`, wrapped with Inko's own fields.
 """
-import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -15,7 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import analysis, auth, config, db, history, imaging, jev_checks, photo_checks, social
+from . import analysis, auth, config, db, history, imaging, photo_checks, social
 from .errors import MESSAGES, InkoError
 from .pending import pending
 
@@ -55,7 +54,7 @@ async def no_stale_app_files(request: Request, call_next):
 
 @app.get("/api/health")
 async def health():
-    return {"ok": True, "analysis": await analysis.health(), "jev": jev_checks.enabled()}
+    return {"ok": True, "analysis": await analysis.health()}
 
 
 @app.get("/api/scoring-model")
@@ -81,29 +80,19 @@ async def analyze(request: Request, file: UploadFile = File(...), whole_page: bo
     image = await run_in_threadpool(imaging.prepare, data)
     tilt = await run_in_threadpool(photo_checks.detect_tilt, image.gray)
 
-    # Jev looks at the photo while the backend scores it (skipped when there is no key).
-    jev_task = asyncio.create_task(jev_checks.photo_check(image)) if jev_checks.enabled() else None
-    try:
-        result = await analysis.analyze(image.jpeg, (image.width, image.height) if whole_page else None)
-        jev = await jev_task if jev_task else None
-    finally:
-        if jev_task and not jev_task.done():
-            jev_task.cancel()
-    if jev and jev["has_handwriting"] < jev_checks.NO_HANDWRITING_BELOW:
-        raise InkoError("no_handwriting")
+    result = await analysis.analyze(image.jpeg, (image.width, image.height) if whole_page else None)
 
-    tilted = tilt["tilted"] or bool(jev and jev["tilted"] >= jev_checks.TILTED_AT)
-    shadows = bool(jev and jev["shadows"] >= jev_checks.SHADOWS_AT)
+    tilted = tilt["tilted"]
     response = {
         "result_id": uuid.uuid4().hex,
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "photo_check": {"tilted": tilted, "shadows": shadows, "jev_used": jev is not None},
+        "photo_check": {"tilted": tilted},
         "analysis": result,
         "saved": False,
     }
     complete = result["status"] == "complete" and result["legibilityScore"] is not None
-    log.info("Analyzed %dx%d photo: %s, score %s, tilted %s%s", image.width, image.height, result["status"],
-             result["legibilityScore"], tilted, f", jev {jev}" if jev else "")
+    log.info("Analyzed %dx%d photo: %s, score %s, tilted %s", image.width, image.height, result["status"],
+             result["legibilityScore"], tilted)
     if not complete:
         return response   # needs_better_photo: nothing to save
 

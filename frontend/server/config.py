@@ -28,7 +28,6 @@ _load_dotenv(ROOT / ".env")
 # 5173 so it never clashes with the analysis backend on 8000 (and its CORS list already allows it).
 PORT = int(os.environ.get("INKO_PORT") or 5173)
 DB_PATH = Path(os.environ.get("INKO_DB_PATH") or DATA_DIR / "inko.db")
-TYPESAFE_API_KEY = os.environ.get("TYPESAFE_API_KEY", "").strip()
 
 # The analysis backend (backend/, started with: cd backend && uvicorn app.main:app --reload)
 ANALYSIS_API_URL = (os.environ.get("ANALYSIS_API_URL") or "http://127.0.0.1:8000").rstrip("/")

@@ -3,10 +3,6 @@
 MESSAGES = {
     "wrong_file_type": "Oops! Please upload a PNG, JPEG, or HEIC photo.",
     "file_too_big": "That photo is too large. Please try a smaller one (under 10 MB).",
-    "no_handwriting": (
-        "We couldn’t find any handwriting. Make sure your writing is in black pen "
-        "on white paper and fills the photo."
-    ),
     "analysis_failed": "Miggle got a little confused by this one. Please try another photo.",
     "analysis_offline": "Miggle can’t reach the scoring server right now. Please try again in a moment.",
     "not_signed_in": "Please sign in first.",
@@ -19,7 +15,6 @@ MESSAGES = {
 STATUS = {
     "wrong_file_type": 415,
     "file_too_big": 413,
-    "no_handwriting": 422,
     "analysis_failed": 500,
     "analysis_offline": 503,
     "not_signed_in": 401,

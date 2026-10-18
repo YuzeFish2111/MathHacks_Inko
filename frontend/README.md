@@ -129,28 +129,22 @@ These come from `IMPORTANT_READS.md` and the contract, and the code follows them
 - Miggle's About Us bio: `web/js/content.js` (`MIGGLE`)
 - Instagram posts to embed on Contact: `web/js/content.js` (`CONTACT.instagramPosts`); the newest YouTube video appears by itself
 
-## Jev (TypeSafe), optional
-
-Copy `.env.example` to `.env` and set `TYPESAFE_API_KEY` (create one at
-https://console.typesafe.ai/keys). With a key, Jev double-checks each photo (taken at an angle?
-any handwriting? strong shadows?). Without a key, or if Jev is slow or unreachable, Inko skips it
-and uses its OpenCV tilt check alone.
-
 ## Tests
 
 ```bash
 .venv/bin/python -m pytest server/tests -q
 ```
 
-The tests never call the real backend: they use the example responses in `../shared/fixtures/`,
-validated against the backend's contract. The backend's own tests (`cd backend && python3 -m pytest`)
+The tests don't need the backend running: they use the example responses in `../shared/fixtures/`,
+validated against the backend's contract. One test (`test_whole_page.py`) also runs the real backend
+in-process when its packages are installed, and is skipped otherwise. The backend's own tests (`cd backend && python3 -m pytest`)
 also check that `src/types/analysis.ts` still matches `schemas.py`, so keep that file.
 
 ## Folders
 
 | Folder | What it holds |
 | --- | --- |
-| `server/` | Inko's FastAPI server: `/analyze` (forwards to the backend), HEIC/EXIF handling, tilt check, accounts, history, Jev |
+| `server/` | Inko's FastAPI server: `/analyze` (forwards to the backend), HEIC/EXIF handling, tilt check, accounts, history |
 | `web/` | The web app (plain HTML, CSS, JS modules, no build step), service worker, manifest, icons |
 | `src/types/analysis.ts` | The contract types in TypeScript. Not used by Inko's plain JS, but the backend's tests check it |
 | `scripts/` | Generators for the example photo and icons, demo account seeding |

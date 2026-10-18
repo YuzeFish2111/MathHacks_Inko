@@ -71,7 +71,7 @@ def main() -> None:
             overall = round(100 * sum(feature_scores.values()) / len(feature_scores))
             result = {
                 "result_id": rid, "created_at": when,
-                "photo_check": {"tilted": False, "shadows": False, "jev_used": False},
+                "photo_check": {"tilted": False},
                 "analysis": {**base, "rectifiedImage": None, "featureScores": scores,
                              "legibilityScore": overall, "scoreLabel": score_label(overall)},
                 "overall_score": overall,

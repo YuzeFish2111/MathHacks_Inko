@@ -4,7 +4,6 @@ export const MSG = {
   angle_warning: "Hmm, this photo looks tilted, so your letters may appear stretched. Try retaking it straight from above for an accurate score.",
   wrong_file_type: "Oops! Please upload a PNG, JPEG, or HEIC photo.",
   file_too_big: "That photo is too large. Please try a smaller one (under 10 MB).",
-  no_handwriting: "We couldn’t find any handwriting. Make sure your writing is in black pen on white paper and fills the photo.",
   server_down: "Can’t connect right now. Please try again in a moment.",
   loading: "Miggle is reading your handwriting… she thinks your “.” is a birdseed… delicious",
   analysis_failed: "Miggle got a little confused by this one. Please try another photo.",

@@ -14,8 +14,6 @@ pillow-heif==1.8.1
 # Terminal QR code for opening the app on a phone
 qrcode==8.2
 
-# Optional Jev (TypeSafe) photo checks
-typesafe-sdk==0.7.5
 
 # Tests
 pytest==9.1.1

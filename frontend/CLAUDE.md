@@ -12,7 +12,7 @@ them, offers practice worksheets, and (with an account) tracks progress over tim
 - **Analysis backend** (`../backend`, owned by the backend team): `POST /api/analyze`, contract in
   `../shared/analysis-contract.md` (schema 2.1). Inko never scores anything itself.
 - **Inko server** (`server/`, FastAPI, port 5173): serves `web/`, accounts, history (SQLite in
-  `data/`), optional Jev photo checks, and `POST /analyze`, which prepares the photo (HEIC, EXIF,
+  `data/`), and `POST /analyze`, which prepares the photo (HEIC, EXIF,
   resize), forwards it to the backend, validates the answer with `backend/app/schemas.py`, and
   returns `{ analysis: <AnalysisResponse>, result_id, created_at, photo_check, saved, overall_score, scores }`.
 - **Web app** (`web/`): plain HTML/CSS/JS modules, no build step. Reads contract fields by their exact

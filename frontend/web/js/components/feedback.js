@@ -27,10 +27,6 @@ export function buildMessages(result, { onPick, refs, highlights }) {
     opts: { cls: "note" },
   });
 
-  if (result.photo_check && result.photo_check.shadows) {
-    items.push({ content: "I spotted some shadows on the page. A brighter spot will help me read even better next time." });
-  }
-
   const marked = Object.keys(FEATURES).filter((id) => !PAGE_WIDE_FEATURES.has(id) && highlights && highlights.count(id) > 0);
   if (marked.length) {
     items.push({ content: `I marked the spots behind ${marked.length === 1 ? "one feature" : `${marked.length} features`} on your page. Tap a feature above, or a tip below, to see them.` });
