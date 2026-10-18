@@ -83,7 +83,7 @@ def decode_image(imageBytes: bytes) -> np.ndarray:
 
     return originalImage
 
-#crops out the useless stuff outside the image
+#crops away everything outside the page (the desk around it), without stretching the page
 def crop_page(originalImage: np.ndarray, cornerPointsPx: list[tuple[float, float]],
               targetWidthPx: int = TARGET_IMAGE_WIDTH_PX) -> np.ndarray:
     """Cut the page out of the photo (rectifiedImage) WITHOUT reshaping it.
@@ -195,7 +195,8 @@ def detect_page_corners(originalImage: np.ndarray) -> Optional[list[tuple[float,
     smallImage = cv2.resize(originalImage, None, fx=shrinkFactor, fy=shrinkFactor, interpolation=cv2.INTER_AREA)
     smallGrayscale = to_grayscale(smallImage)
 
-    #converts rgb to grayscale and resize to target width (1000)
+    #tries each candidate mask (bright areas, then edges) and returns the first outline with four
+    #corners that passes the page checks; corners are scaled back up to the original photo's size
     for pageMask in _candidate_page_masks(smallGrayscale):
         contours, _ = cv2.findContours(pageMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:5]:    # biggest outlines first
@@ -220,7 +221,7 @@ def resize_to_width(image: np.ndarray, targetWidthPx: int = TARGET_IMAGE_WIDTH_P
     interpolation = cv2.INTER_AREA if resizeFactor < 1 else cv2.INTER_LINEAR
     return cv2.resize(image, (targetWidthPx, targetHeightPx), interpolation=interpolation)
 
-#blur the result
+#estimates how bright the bare paper is at each point: erases the ink, then smooths what's left
 def estimate_background(grayscaleImage: np.ndarray) -> np.ndarray:
     """backgroundEstimate: how bright the bare paper is at every pixel.
 
@@ -262,9 +263,9 @@ def threshold_ink(grayscaleImage: np.ndarray) -> np.ndarray:
         THRESHOLD_BLOCK_SIZE_PX,
         THRESHOLD_OFFSET_C,
     )
+
+
 #removes small blobs of ink that are likely noise
-
-
 def remove_small_components(inkMask: np.ndarray, minAreaPx: int = MIN_COMPONENT_AREA_PX) -> np.ndarray:
     """Drop connected ink components smaller than minAreaPx (isolated noise)."""
     # Connected components: every separate blob of touching ink pixels (diagonals count, so
@@ -273,7 +274,7 @@ def remove_small_components(inkMask: np.ndarray, minAreaPx: int = MIN_COMPONENT_
     _, labels, componentStats, _ = cv2.connectedComponentsWithStats(inkMask, connectivity=8)
     keep = componentStats[:, cv2.CC_STAT_AREA] >= minAreaPx    # one True/False per blob number
     keep[0] = False    # label 0 is the paper background
-    #keeps labels of the minimum ink area
+    #keeps only blobs with at least the minimum ink area
     # keep[labels] looks up every pixel's blob number in `keep`: a True/False image in one step, no loop
     return np.where(keep[labels], 255, 0).astype(np.uint8)
 
@@ -299,10 +300,10 @@ def measure_edge_sharpness(grayscaleImage: np.ndarray, inkMask: np.ndarray,
     divided by inkContrast. Blur spreads each edge over more pixels, lowering the ratio; dividing
     by contrast means faint-but-sharp writing is not mistaken for blur.
     """
+    # no ink contrast: sharpness can't be measured, so return None (unknown), not an error
     if not inkContrast or inkContrast <= 0:
         return None
-    # if no contrast, produce error
-    #calculates brightness changes 
+    #calculates brightness changes
     imageFloat = grayscaleImage.astype(np.float32)
     # Sobel / 8 = brightness change per pixel (central difference, smoothed across 3 rows)
     gradientX = cv2.Sobel(imageFloat, cv2.CV_32F, 1, 0, ksize=3) / 8

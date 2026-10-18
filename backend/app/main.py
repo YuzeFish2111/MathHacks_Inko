@@ -90,11 +90,12 @@ def to_jpeg_data_url(image: np.ndarray) -> str:
 # ---------- 3. Request parsing ----------
 
 def parse_request_fields(pageWidthMm: Optional[float], pageHeightMm: Optional[float],
-                         cornerPointsPx: Optional[str]) -> AnalyzeRequestFields:
+                         cornerPointsPx: Optional[str], isDrawing: bool = False) -> AnalyzeRequestFields:
     """Validate the form fields. Bad fields are a bug in the caller, so they get HTTP 422, not needs_better_photo."""
     try:
         corners = json.loads(cornerPointsPx) if cornerPointsPx else None
-        return AnalyzeRequestFields(pageWidthMm=pageWidthMm, pageHeightMm=pageHeightMm, cornerPointsPx=corners)
+        return AnalyzeRequestFields(pageWidthMm=pageWidthMm, pageHeightMm=pageHeightMm, cornerPointsPx=corners,
+                                    isDrawing=isDrawing)
     except (json.JSONDecodeError, ValidationError) as error:
         raise HTTPException(status_code=422, detail=f"Invalid form fields: {error}")
 
@@ -132,7 +133,17 @@ async def read_and_check_upload(imageFile: UploadFile, qualityChecks: list[dict]
 
 def prepare_page(originalImage: np.ndarray, fields: AnalyzeRequestFields,
                  qualityChecks: list[dict], warnings: list[str]):
-    """Return deskewed page, pre-deskew height/width, and whether page bounds were found."""
+    """Return deskewed page, pre-deskew height/width, and whether page bounds were found.
+
+    A drawing is used whole, with no page detection and no page bounds: a screen is not a sheet of paper,
+    so letter size can't be judged against it.
+    """
+    if fields.isDrawing:
+        grayscaleImage = resize_to_width(to_grayscale(originalImage))
+        pageHeightPx, pageWidthPx = grayscaleImage.shape
+        deskewedImage, _ = deskew(normalize_illumination(grayscaleImage))
+        return deskewedImage, pageHeightPx, pageWidthPx, False
+
     cornerPointsPx = fields.cornerPointsPx
     if cornerPointsPx is None:
         cornerPointsPx = detect_page_corners(originalImage)
@@ -211,10 +222,30 @@ def segment_writing(grayscaleImage: np.ndarray, qualityChecks: list[dict]):
     find_components(inkMask, textLines)
     letterCount = sum(component.kind == "letter" for line in textLines for component in line.components)
     if letterCount < MIN_LETTERS_FOR_ANALYSIS:
-        raise PhotoProblem("SEGMENTATION_UNCERTAIN", "segmentation",
-                           "We couldn't separate the letters clearly. Try printing with small gaps between letters.")
+        raise PhotoProblem("SEGMENTATION_UNCERTAIN", "segmentation", segmentation_message(textLines, letterCount))
     qualityChecks.append(passed("segmentation"))
     return inkMask, textLines
+
+
+def segmentation_message(textLines, letterCount: int) -> str:
+    """Why there are too few separate letters: joined letters, or simply too little writing.
+
+    A cluster (joined letters) holds about (its width / a typical letter's width) letters. If counting
+    those would reach MIN_LETTERS_FOR_ANALYSIS, the letters are there but touching; otherwise the
+    writing is just too short (e.g. two big words on the drawing pad), however well it is spaced.
+    """
+    components = [component for line in textLines for component in line.components]
+    letterWidthsPx = [c.widthPx for c in components if c.kind == "letter"] or \
+                     [c.heightPx for c in components if c.kind != "mark"]
+    typicalWidthPx = float(np.median(letterWidthsPx)) if letterWidthsPx else 0.0
+    lettersInClusters = sum(max(2, round(c.widthPx / typicalWidthPx)) if typicalWidthPx > 0 else 2
+                            for c in components if c.kind == "cluster")
+    found = f"{letterCount} separate letter{'' if letterCount == 1 else 's'}"
+    if letterCount + lettersInClusters >= MIN_LETTERS_FOR_ANALYSIS:
+        return (f"Some letters are joined together, so we found only {found}. "
+                "Try printing with small gaps between letters.")
+    return (f"We found only {found}, and we need at least {MIN_LETTERS_FOR_ANALYSIS} to compare them. "
+            "Write a little more, such as a full sentence.")
 
 
 # ---------- 7. Overlays: what the browser draws on top of rectifiedImage ----------
@@ -269,6 +300,7 @@ async def analyze(
     pageWidthMm: Optional[float] = Form(None),
     pageHeightMm: Optional[float] = Form(None),
     cornerPointsPx: Optional[str] = Form(None),
+    isDrawing: bool = Form(False),
 ) -> dict:
     """Photo in, legibility estimate out. Every step either passes a quality check or stops with a retry message.
 
@@ -276,7 +308,7 @@ async def analyze(
     Flow: check the upload -> find and flatten the page -> ink, contrast, blur and segmentation checks
     -> 10 measurements -> 8 feature scores -> final score, overlays and tips.
     """
-    fields = parse_request_fields(pageWidthMm, pageHeightMm, cornerPointsPx)
+    fields = parse_request_fields(pageWidthMm, pageHeightMm, cornerPointsPx, isDrawing)
     qualityChecks: list[dict] = []
     warnings: list[str] = []
 
@@ -292,9 +324,14 @@ async def analyze(
                                                        canvasHeightPx if boundsKnown else None)
     append_text_size_warning(featureMeasurements, fields, canvasHeightPx, canvasWidthPx, boundsKnown, warnings)
     scoring = score_measurements(featureMeasurements)
-    if scoring["missingFeatureIds"]:
+    missingFeatureIds = scoring["missingFeatureIds"]
+    if fields.isDrawing:
+        warnings.append("Letter size isn't measured for on-screen writing: a screen isn't a page, so there's "
+                        "nothing to compare the letter size with. The score uses the other features.")
+        missingFeatureIds = [featureId for featureId in missingFeatureIds if featureId != "textSize"]
+    if missingFeatureIds:
         warnings.append("Some features could not be measured and were left out of the score: "
-                        + ", ".join(scoring["missingFeatureIds"]) + ".")
+                        + ", ".join(missingFeatureIds) + ".")
 
     # OCR is display only ("what a computer read"); it never affects the score. It takes a second or two
     # of CPU, so it runs in a worker thread instead of blocking the server for other requests.

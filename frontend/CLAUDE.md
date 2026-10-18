@@ -29,8 +29,9 @@ them, offers practice worksheets, and (with an account) tracks progress over tim
 ## Photo input (important)
 - Upload button: `accept="image/*"` with `capture="environment"` so phones can open the rear camera, AND allow choosing from the photo library.
 - EXIF rotation and HEIC are handled in `server/imaging.py` before forwarding, so the backend always gets an upright JPEG.
-- Drawings and the bundled example are sent with `whole_page` so the backend is told the whole image is the page
+- The bundled example is sent with `whole_page` so the backend is told the whole image is the page
   (otherwise it can't judge letter size without page edges).
+- Drawings are sent with `drawing` (backend `isDrawing`): used whole, letter size "Not measured" (a screen isn't a page).
 - On-screen writing: HTML canvas → export as an image → same `/analyze` endpoint.
 
 ## PWA

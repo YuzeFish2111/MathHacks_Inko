@@ -50,6 +50,8 @@ export interface AnalyzeRequest {
   pageHeightMm?: number;
   /** Page corners: top-left, top-right, bottom-right, bottom-left. Sent as a JSON string. */
   cornerPointsPx?: [PointPx, PointPx, PointPx, PointPx];
+  /** On-screen drawing: used whole, and letter size (textHeightCanvasRatio) is null. */
+  isDrawing?: boolean;
 }
 
 // ---------- response parts ----------

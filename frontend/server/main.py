@@ -73,14 +73,16 @@ def summary_scores(result: dict) -> dict:
 
 
 @app.post("/analyze")
-async def analyze(request: Request, file: UploadFile = File(...), whole_page: bool = Form(False)):
-    """whole_page: the whole image is the page (on-screen drawing, bundled example), so the backend
-    is told its exact bounds instead of looking for page edges that aren't there."""
+async def analyze(request: Request, file: UploadFile = File(...), whole_page: bool = Form(False),
+                  drawing: bool = Form(False)):
+    """whole_page: the whole image is the page (bundled example), so the backend is told its exact bounds
+    instead of looking for page edges that aren't there.
+    drawing: on-screen writing. Used whole too, but a screen isn't a page, so letter size is "Not measured"."""
     data = await file.read()
     image = await run_in_threadpool(imaging.prepare, data)
     tilt = await run_in_threadpool(photo_checks.detect_tilt, image.gray)
 
-    result = await analysis.analyze(image.jpeg, (image.width, image.height) if whole_page else None)
+    result = await analysis.analyze(image.jpeg, (image.width, image.height) if whole_page else None, drawing)
 
     tilted = tilt["tilted"]
     response = {

@@ -35,6 +35,9 @@ class AnalyzeRequestFields(ContractModel):
     # Four [x, y] page corners in originalImage pixels: top-left, top-right, bottom-right, bottom-left.
     # Sent as a JSON string in the form; parse it before building this model.
     cornerPointsPx: Optional[list[tuple[float, float]]] = Field(default=None, min_length=4, max_length=4)
+    # On-screen drawing: the whole image is the writing area, but it is not a sheet of paper, so there is
+    # no page to judge letter size against (textHeightCanvasRatio is null). Page detection is skipped.
+    isDrawing: bool = False
 
 
 # ---------- response parts ----------

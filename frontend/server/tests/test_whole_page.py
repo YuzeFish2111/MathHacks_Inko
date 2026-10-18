@@ -1,8 +1,11 @@
-"""Drawings and the bundled example have no page edges: the whole image IS the page.
+"""The bundled example and on-screen drawings have no page edges to find.
 
-Inko sends them with whole_page, which becomes full-image cornerPointsPx for the analysis backend.
-Without it the backend can't tell "page fills the photo" from "no page found", so it leaves
-textHeightCanvasRatio (the letter-size measurement) out.
+The example is a photo of a page that fills the image: Inko sends it with whole_page, which becomes
+full-image cornerPointsPx, so letter size is judged against that page. Without it the backend can't tell
+"page fills the photo" from "no page found", so it leaves textHeightCanvasRatio (letter size) out.
+
+A drawing is sent with drawing, which becomes isDrawing: the image is used whole too, but a screen isn't
+a page, so letter size is "Not measured" and the score comes from the other seven features.
 """
 import json
 import sys
@@ -19,9 +22,20 @@ EXAMPLE = (config.WEB_DIR / "img" / "example.jpg").read_bytes()
 REAL_ANALYZE = analysis.analyze          # captured before the autouse fixture swaps in a fake
 
 
-def post(whole_page=None):
-    data = {"whole_page": whole_page} if whole_page is not None else None
+def post(whole_page=None, drawing=None):
+    data = {k: v for k, v in {"whole_page": whole_page, "drawing": drawing}.items() if v is not None} or None
     return client.post("/analyze", data=data, files={"file": ("e.jpg", EXAMPLE, "image/jpeg")})
+
+
+def test_drawing_flag_is_forwarded(backend):
+    assert post(drawing="true").status_code == 200
+    assert backend.drawingFlags[-1] is True and backend.wholePageSizes[-1] is None
+    assert post("true").status_code == 200
+    assert backend.drawingFlags[-1] is False                     # the example is a page, not a drawing
+
+
+def test_drawing_form_field_names_match_the_backend():
+    assert "isDrawing" in analysis.schemas.AnalyzeRequestFields.model_fields
 
 
 def test_whole_page_flag_sends_the_image_size(backend):
@@ -64,3 +78,9 @@ def test_real_backend_scores_letter_size_only_with_the_flag(monkeypatch):
     assert withFlag["featureMeasurements"]["textHeightCanvasRatio"] is not None
     assert "textSize" not in withFlag["missingFeatureIds"]
     assert without["featureMeasurements"]["textHeightCanvasRatio"] is None   # ordinary photo, no edges found
+
+    drawing = post(drawing="true").json()["analysis"]
+    assert drawing["status"] == "complete" and drawing["legibilityScore"] is not None
+    assert drawing["featureMeasurements"]["textHeightCanvasRatio"] is None   # a screen isn't a page
+    assert drawing["missingFeatureIds"] == ["textSize"]
+    assert not any("page edges" in warning for warning in drawing["warnings"])

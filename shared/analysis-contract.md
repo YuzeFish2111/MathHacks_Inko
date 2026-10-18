@@ -99,6 +99,7 @@ If EasyOCR isn't installed or its model can't load, `recognizedText` is null and
 | `pageWidthMm` | optional | positive finite number; warning-only |
 | `pageHeightMm` | optional | positive finite number; warning-only |
 | `cornerPointsPx` | optional | JSON string `[[x,y],[x,y],[x,y],[x,y]]` in originalImage pixels, order top-left, top-right, bottom-right, bottom-left |
+| `isDrawing` | optional | boolean, default `false`. The image is an on-screen drawing: it is used whole (no page detection, `cornerPointsPx` ignored), and because a screen is not a page, `textHeightCanvasRatio` is `null` and `textSize` is listed in `missingFeatureIds`. The score uses the other seven features. Added in 2.1 as an optional field, so older callers are unaffected. |
 
 Rotating the photo (the preview screen's "Rotate 90°" button) happens in the browser before upload
 (`frontend/src/utils/rotateImage.ts`). The backend only ever sees the uploaded, already-rotated image,

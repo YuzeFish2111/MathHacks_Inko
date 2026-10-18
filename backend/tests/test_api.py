@@ -134,7 +134,21 @@ def test_file_too_large():
 def test_too_few_letters_is_segmentation_uncertain():
     page = np.full((1414, 1000, 3), 255, np.uint8)
     cv2.putText(page, "abc", (300, 600), cv2.FONT_HERSHEY_SIMPLEX, 5, (0, 0, 0), 12)   # plenty of ink, 3 letters
-    assert error_code(post(png_bytes(page))) == "SEGMENTATION_UNCERTAIN"
+    response = post(png_bytes(page))
+    assert error_code(response) == "SEGMENTATION_UNCERTAIN"
+    # Well spaced but short (e.g. two big words on the drawing pad): ask for more writing, not for gaps
+    assert response.json()["error"]["message"].startswith("We found only 3 separate letters")
+
+
+def test_joined_letters_are_told_to_leave_gaps():
+    page = np.full((1414, 1000, 3), 255, np.uint8)
+    cv2.putText(page, "abc", (100, 500), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 0), 10)
+    for row, text in enumerate(("mmmmmm", "nnnnnn", "uuuuuu")):                       # long joined runs
+        cv2.putText(page, text, (100, 750 + 200 * row), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 0), 10)
+        cv2.line(page, (100, 755 + 200 * row), (850, 755 + 200 * row), (0, 0, 0), 10)   # joining stroke
+    response = post(png_bytes(page))
+    assert error_code(response) == "SEGMENTATION_UNCERTAIN"
+    assert response.json()["error"]["message"].startswith("Some letters are joined together")
 
 
 def test_corners_on_the_exact_photo_border_are_accepted():
@@ -245,6 +259,31 @@ def test_api_still_works_when_ocr_is_unavailable():
     assert body["recognizedText"] is None
     assert "ocrReadability" not in body["featureScores"] and "ocrConfidencePct" not in body["featureMeasurements"]
     assert sum(1 for warning in body["warnings"] if "Text recognition" in warning) == 1
+
+
+def test_drawing_scores_everything_except_letter_size():
+    drawing = post(png_bytes(make_page_photo()), isDrawing="true").json()
+    AnalysisResponse.model_validate(drawing)
+    assert drawing["status"] == "complete"
+    assert drawing["featureMeasurements"]["textHeightCanvasRatio"] is None and drawing["featureScores"]["textSize"] is None
+    assert drawing["missingFeatureIds"] == ["textSize"]
+    # A valid score from the other seven features, each weighted 1/7
+    assert drawing["legibilityScore"] is not None and drawing["scoreLabel"]
+    assert set(drawing["featureWeights"]) == set(drawing["featureScores"]) - {"textSize"}
+    assert all(abs(weight - 1 / 7) < 1e-9 for weight in drawing["featureWeights"].values())
+    expected = round(100 * sum(drawing["featureScores"][f] / 7 for f in drawing["featureWeights"]) + 1e-9)
+    assert abs(drawing["legibilityScore"] - expected) <= 1
+    # No page detection, so no page-edge check or "adjust the corners" warning; one clear note instead
+    assert "pageBounds" not in [check["checkId"] for check in drawing["qualityChecks"]]
+    assert not any("page edges" in warning for warning in drawing["warnings"])
+    assert sum("isn't measured for on-screen writing" in warning for warning in drawing["warnings"]) == 1
+    assert not any("left out of the score" in warning for warning in drawing["warnings"])
+    # The other measurements are exactly what the same image gets as a photo of a page
+    asPage = post(png_bytes(make_page_photo()), cornerPointsPx=json.dumps([[0, 0], [1000, 0], [1000, 1414], [0, 1414]])).json()
+    assert asPage["featureMeasurements"]["textHeightCanvasRatio"] is not None
+    for name, value in drawing["featureMeasurements"].items():
+        if name != "textHeightCanvasRatio":
+            assert value == asPage["featureMeasurements"][name], name
 
 
 def test_canvas_ratio_is_null_without_page_edges():

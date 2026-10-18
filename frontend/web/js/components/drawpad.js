@@ -24,7 +24,7 @@ export function createDrawPad({ onSubmit }) {
   const undoBtn = h("button", { class: "btn btn-small btn-soft", type: "button" }, icon("undo"), "Undo");
   const clearBtn = h("button", { class: "btn btn-small btn-soft", type: "button" }, icon("trash"), "Clear");
   const submitBtn = h("button", { class: "btn btn-big", type: "button" }, icon("sparkle"), "Analyze my writing");
-  const hint = h("p", { class: "draw-hint" }, "Write a sentence or two in your normal handwriting. Bigger is better!");
+  const hint = h("p", { class: "draw-hint" }, "Write a sentence or two (at least 10 letters) in your normal handwriting, along the lines.");
 
   const el = h("div", { class: "draw-pad" },
     hint,
