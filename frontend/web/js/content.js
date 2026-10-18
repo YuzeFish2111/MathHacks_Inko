@@ -8,10 +8,10 @@ export const MIGGLE = {
 };
 
 export const FOUNDERS = [
-  { name: "", photo: "", bio: "" },   // photo: e.g. "img/founders/alex.jpg"
-  { name: "", photo: "", bio: "" },
-  { name: "", photo: "", bio: "" },
-  { name: "", photo: "", bio: "" },
+  { name: "Sophie Lin", photo: "", bio: "Grade 10 Student at UTS" },   // photo: e.g. "img/founders/alex.jpg"
+  { name: "Ayden Qin", photo: "", bio: "Grade 10 Student at UTS" },
+  { name: "Catherine Sun", photo: "", bio: "Grade 10 Student at UTS" },
+  { name: "April Ye", photo: "", bio: "Grade 10 Student at UTS" },
 ];
 
 export const CONTACT = {
