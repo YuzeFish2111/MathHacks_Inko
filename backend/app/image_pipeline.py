@@ -301,7 +301,8 @@ def measure_edge_sharpness(grayscaleImage: np.ndarray, inkMask: np.ndarray,
     """
     if not inkContrast or inkContrast <= 0:
         return None
-    # 
+    # if no contrast, produce error
+    #calculates brightness changes 
     imageFloat = grayscaleImage.astype(np.float32)
     # Sobel / 8 = brightness change per pixel (central difference, smoothed across 3 rows)
     gradientX = cv2.Sobel(imageFloat, cv2.CV_32F, 1, 0, ksize=3) / 8
