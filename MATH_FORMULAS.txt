@@ -1,5 +1,5 @@
-INKO: EVERY MATHEMATICAL FORMULA IN THE PROJECT
-================================================
+INKO: CHRONOLOGICAL PIPELINE OF EVERY MATHEMATICAL FORMULA IN THE PROJECT
+=========================================================================
 
 How to read this file
 ---------------------
